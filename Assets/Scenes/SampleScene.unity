@@ -16641,6 +16641,7 @@ GameObject:
   - component: {fileID: 2137863480}
   - component: {fileID: 2137863483}
   - component: {fileID: 2137863482}
+  - component: {fileID: 2137863484}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -16697,7 +16698,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 885dcf034d118294fb26ef063d8611d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomCode: 6LTS
+  roomCode: PRCY
 --- !u!114 &2137863483
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16722,6 +16723,32 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
+--- !u!114 &2137863484
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2137863477}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3b2d5e23d01154246837ab3c6dc4707e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gameVersion: 1.0
+  waitingPanel: {fileID: 0}
+  statusText: {fileID: 0}
+  linkText: {fileID: 0}
+  seatLabels:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  gameManager: {fileID: 1660480917}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
