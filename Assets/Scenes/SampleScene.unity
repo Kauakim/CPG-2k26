@@ -14282,7 +14282,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxPlayers: 8
-  minPlayers: 2
+  minPlayers: 3
   timerMax: 30
   timerPenalty: 8
   cardEarnThreshold: 5
@@ -16697,7 +16697,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 885dcf034d118294fb26ef063d8611d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomCode: 96HN
+  roomCode: 6LTS
 --- !u!114 &2137863483
 MonoBehaviour:
   m_ObjectHideFlags: 0
