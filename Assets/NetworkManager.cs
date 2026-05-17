@@ -50,10 +50,12 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
     {
         PhotonNetwork.GameVersion            = gameVersion;
         PhotonNetwork.AutomaticallySyncScene = false;
-        PhotonNetwork.NickName               = "Jogador"; // nome genérico, sem input
+        PhotonNetwork.NickName               = "Jogador";
 
-        // Lê código da URL antes de conectar
         pendingRoomCode = ReadRoomCodeFromURL();
+
+        Debug.Log($"[Network] Iniciando — modo: {(pendingRoomCode != null ? "CLIENTE (código: " + pendingRoomCode + ")" : "HOST")}");
+        Debug.Log("[Network] Tentando conectar ao Photon...");
 
         SetStatus(pendingRoomCode != null ? "Entrando na sessão..." : "Iniciando sessão...");
         if (waitingPanel != null) waitingPanel.SetActive(true);
@@ -65,19 +67,28 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnConnectedToMaster()
     {
+        Debug.Log("[Network] ✓ Conectado ao servidor Photon. Entrando no lobby...");
         PhotonNetwork.JoinLobby(TypedLobby.Default);
     }
 
     public override void OnJoinedLobby()
     {
+        Debug.Log("[Network] ✓ Lobby Photon pronto.");
         if (pendingRoomCode != null)
-            JoinRoom(pendingRoomCode);   // veio de link → entra direto
+        {
+            Debug.Log($"[Network] Tentando entrar na sala: {pendingRoomCode}");
+            JoinRoom(pendingRoomCode);
+        }
         else
-            CreateRoom();               // é o host → cria sala
+        {
+            Debug.Log("[Network] Criando nova sala...");
+            CreateRoom();
+        }
     }
 
     public override void OnDisconnected(DisconnectCause cause)
     {
+        Debug.LogWarning($"[Network] ✗ Desconectado: {cause}");
         SetStatus("Desconectado: " + cause);
     }
 
@@ -261,10 +272,15 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
         }
         catch { return null; }
 #else
-        // No editor: simula entrada via args para testes (-room XXXX)
+        // PlayerPrefs — usado no Editor para simular um segundo jogador
+        string debugRoom = PlayerPrefs.GetString("debug_room", "");
+        if (!string.IsNullOrEmpty(debugRoom)) return debugRoom;
+
+        // Argumento de linha de comando: game.exe -room XXXX
         string[] args = System.Environment.GetCommandLineArgs();
         for (int i = 0; i < args.Length - 1; i++)
             if (args[i] == "-room") return args[i + 1];
+
         return null;
 #endif
     }
