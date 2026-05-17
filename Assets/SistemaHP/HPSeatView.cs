@@ -9,12 +9,14 @@ public class HPSeatView : MonoBehaviour
     [Header("Textos")]
     [SerializeField] private Text nameText;
     [SerializeField] private Text livesText;
-    [SerializeField] private Text cardText;
     [SerializeField] private Text badgeText;
 
-    [Header("Imagens")]
+    [Header("Imagens — Vidas")]
     [SerializeField] private Image livesImage;
-    [SerializeField] private Image cardImage;
+
+    [Header("Imagens — Cartas (slots separados)")]
+    [SerializeField] private Image cardImage1;   // HeldCard
+    [SerializeField] private Image cardImage2;   // HeldCard2
 
     [Header("Sprites — Vidas")]
     [SerializeField] private Sprite life0;
@@ -40,10 +42,10 @@ public class HPSeatView : MonoBehaviour
     {
         nameText   = Find<Text>("Name");
         livesText  = Find<Text>("Lives");
-        cardText   = Find<Text>("Cards");
         badgeText  = Find<Text>("Badge");
         livesImage = Find<Image>("LivesImage");
-        cardImage  = Find<Image>("CardImage");
+        cardImage1 = Find<Image>("CardImage1");
+        cardImage2 = Find<Image>("CardImage2");
 #if UNITY_EDITOR
         UnityEditor.EditorUtility.SetDirty(this);
 #endif
@@ -55,23 +57,25 @@ public class HPSeatView : MonoBehaviour
         return t != null ? t.GetComponent<T>() : null;
     }
 
-    // ── API ──────────────────────────────────────────────────────────────────
+    // ── API ───────────────────────────────────────────────────────────────────
 
     public void SetPlayer(HPPlayer player, int seatNumber)
     {
         if (player == null)
         {
-            if (nameText  != null) nameText.text = "Slot " + seatNumber;
-            if (livesText != null) { livesText.text = ""; livesText.gameObject.SetActive(false); }
-            if (livesImage != null) { livesImage.sprite = null; livesImage.gameObject.SetActive(false); }
-            if (cardText  != null) cardText.text = "";
-            if (cardImage != null) cardImage.gameObject.SetActive(false);
-            if (badgeText != null) badgeText.gameObject.SetActive(false);
+            if (nameText   != null) nameText.text = "Slot " + seatNumber;
+            if (livesText  != null) { livesText.text = ""; livesText.gameObject.SetActive(false); }
+            if (livesImage != null) livesImage.gameObject.SetActive(false);
+            if (badgeText  != null) badgeText.gameObject.SetActive(false);
+            SetCardSlot(cardImage1, HPCardType.None);
+            SetCardSlot(cardImage2, HPCardType.None);
             return;
         }
 
+        // Nome
         if (nameText != null) nameText.text = player.Name;
 
+        // Vidas
         Sprite livesSprite = GetLivesSprite(player.Lives);
         if (livesSprite != null)
         {
@@ -84,17 +88,24 @@ public class HPSeatView : MonoBehaviour
             if (livesText  != null) { livesText.text = LivesString(player.Lives); livesText.gameObject.SetActive(true); }
         }
 
-        HPCardType card = player.HeldCard != HPCardType.None ? player.HeldCard : player.HeldCard2;
-        Sprite cardSprite = GetCardSprite(card);
-        if (cardSprite != null)
+        // Dois slots de carta independentes
+        SetCardSlot(cardImage1, player.HeldCard);
+        SetCardSlot(cardImage2, player.HeldCard2);
+    }
+
+    /// Atualiza um slot de carta: exibe o sprite se houver carta, esconde se não houver.
+    private void SetCardSlot(Image slot, HPCardType cardType)
+    {
+        if (slot == null) return;
+        Sprite spr = GetCardSprite(cardType);
+        if (spr != null)
         {
-            if (cardImage != null) { cardImage.sprite = cardSprite; cardImage.gameObject.SetActive(true); }
-            if (cardText  != null) cardText.text = "";
+            slot.sprite = spr;
+            slot.gameObject.SetActive(true);
         }
         else
         {
-            if (cardImage != null) cardImage.gameObject.SetActive(false);
-            if (cardText  != null) cardText.text = card != HPCardType.None ? HPCardInfo.DisplayName(card) : "";
+            slot.gameObject.SetActive(false);
         }
     }
 
@@ -112,11 +123,10 @@ public class HPSeatView : MonoBehaviour
 
     public void SetTargetHint(bool hint)
     {
-        // Pulso visual para seleção de alvo do Atestado
         if (group != null) group.alpha = hint ? 1f : 0.45f;
     }
 
-    // Mantido para compatibilidade com HPGameManager; no modo cena a Light2D cuida do indicador ativo
+    // Mantido para compatibilidade — a Light2D da cena cuida do indicador ativo
     public void SetLamp(Color color, bool blink) { }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -12,32 +12,32 @@ public class HPCardView : MonoBehaviour
     [SerializeField] private Text       choiceTitleText;
     [SerializeField] private Button     option1Button;
     [SerializeField] private Button     option2Button;
-    [SerializeField] private Image      option1Icon;
-    [SerializeField] private Image      option2Icon;
-    [SerializeField] private Text       option1Label;
-    [SerializeField] private Text       option2Label;
+
+    [Header("Backgrounds dos botões de escolha (um por slot)")]
+    [SerializeField] private Image option1Background;
+    [SerializeField] private Image option2Background;
+
+    [Header("Sprites de background — um por tipo de carta")]
+    [SerializeField] private Sprite bgNP3;
+    [SerializeField] private Sprite bgAtestado;
+    [SerializeField] private Sprite bgMonster;
+    [SerializeField] private Sprite bgGPT;
 
     [Header("Overlay de animação (filho da Canvas, inativo por padrão)")]
     [SerializeField] private GameObject  animOverlay;
-    [SerializeField] private CanvasGroup animGroup;   // CanvasGroup no animOverlay
-    [SerializeField] private Image       animImage;   // Image que exibe os frames
-    [SerializeField] private Image       flashImage;  // Image de flash de fundo (stretched)
+    [SerializeField] private CanvasGroup animGroup;
+    [SerializeField] private Image       animImage;
+    [SerializeField] private Image       flashImage;
 
     [Header("Frames de animação (sprites fatiados de sheet)")]
     [SerializeField] private Sprite[] monsterFrames;
     [SerializeField] private Sprite[] gptFrames;
 
-    [Header("Ícones das cartas (usados nos botões de escolha)")]
-    [SerializeField] private Sprite iconNP3;
-    [SerializeField] private Sprite iconAtestado;
-    [SerializeField] private Sprite iconMonster;
-    [SerializeField] private Sprite iconGPT;
-
     [Header("Notificação flutuante de carta (filho da Canvas, inativo por padrão)")]
-    [SerializeField] private GameObject   floatingRoot;
-    [SerializeField] private Text         floatingText;
+    [SerializeField] private GameObject    floatingRoot;
+    [SerializeField] private Text          floatingText;
     [SerializeField] private RectTransform floatingRect;
-    [SerializeField] private CanvasGroup  floatingGroup;
+    [SerializeField] private CanvasGroup   floatingGroup;
 
     [Header("Posição e duração da notificação flutuante")]
     [SerializeField] private Vector2 floatingStartPos = new Vector2(0f, 118f);
@@ -62,11 +62,13 @@ public class HPCardView : MonoBehaviour
         HideChoice();
         choiceCallback = onChoose;
         if (choicePanel == null) return;
+
         choicePanel.SetActive(true);
         if (choiceTitleText != null)
             choiceTitleText.text = playerName + " ganhou uma carta!";
-        SetupOption(option1Button, option1Icon, option1Label, first);
-        SetupOption(option2Button, option2Icon, option2Label, second);
+
+        SetupOption(option1Button, option1Background, first);
+        SetupOption(option2Button, option2Background, second);
     }
 
     public void HideChoice()
@@ -75,14 +77,15 @@ public class HPCardView : MonoBehaviour
         if (choicePanel != null) choicePanel.SetActive(false);
     }
 
-    private void SetupOption(Button btn, Image icon, Text label, HPCardType cardType)
+    private void SetupOption(Button btn, Image background, HPCardType cardType)
     {
         if (btn == null) return;
+
+        if (background != null) background.sprite = GetBackgroundSprite(cardType);
+
         HPCardType captured = cardType;
         btn.onClick.RemoveAllListeners();
         btn.onClick.AddListener(() => Choose(captured));
-        if (icon  != null) icon.sprite = GetCardIcon(cardType);
-        if (label != null) label.text  = HPCardInfo.DisplayName(cardType);
     }
 
     private void Choose(HPCardType cardType)
@@ -103,7 +106,7 @@ public class HPCardView : MonoBehaviour
     private IEnumerator UseAnimRoutine(HPCardType cardType)
     {
         Sprite[] frames = GetAnimFrames(cardType);
-        Color accent = HPCardInfo.FrameColor(cardType);
+        Color    accent = HPCardInfo.FrameColor(cardType);
 
         if (animOverlay == null || animGroup == null || frames == null || frames.Length == 0)
         {
@@ -114,10 +117,10 @@ public class HPCardView : MonoBehaviour
         animOverlay.SetActive(true);
         animGroup.alpha = 0f;
 
-        const float fps         = 8f;
-        const float holdExtra   = 0.3f;
-        float frameDuration     = 1f / fps;
-        float totalDuration     = frames.Length * frameDuration + holdExtra;
+        const float fps       = 8f;
+        const float holdExtra = 0.3f;
+        float frameDuration   = 1f / fps;
+        float totalDuration   = frames.Length * frameDuration + holdExtra;
         float timer = 0f, frameTimer = 0f;
         int fi = 0;
         if (animImage != null) animImage.sprite = frames[0];
@@ -157,7 +160,6 @@ public class HPCardView : MonoBehaviour
         if (flashImage != null) flashImage.color = Color.clear;
     }
 
-    // Fallback quando não há sprite-sheet: usa apenas flashImage
     private IEnumerator ColorFlashRoutine(Color accent)
     {
         if (flashImage == null) yield break;
@@ -182,7 +184,7 @@ public class HPCardView : MonoBehaviour
         flashImage.color = Color.clear;
     }
 
-    // ── Notificação flutuante de carta obtida ─────────────────────────────────
+    // ── Notificação flutuante ─────────────────────────────────────────────────
 
     public void ShowFloatingCard(string playerName)
     {
@@ -214,23 +216,18 @@ public class HPCardView : MonoBehaviour
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private Sprite[] GetAnimFrames(HPCardType t) =>
-        t == HPCardType.GPT ? gptFrames : monsterFrames;
-
-    public Sprite GetIconSprite(HPCardType t)
+    public Sprite GetBackgroundSprite(HPCardType t)
     {
         switch (t)
         {
-            case HPCardType.NP3:      return iconNP3;
-            case HPCardType.Atestado: return iconAtestado;
-            case HPCardType.Monster:  return iconMonster;
-            case HPCardType.GPT:      return iconGPT;
+            case HPCardType.NP3:      return bgNP3;
+            case HPCardType.Atestado: return bgAtestado;
+            case HPCardType.Monster:  return bgMonster;
+            case HPCardType.GPT:      return bgGPT;
             default:                  return null;
         }
     }
 
-    private Sprite GetCardIcon(HPCardType t)
-    {
-        return GetIconSprite(t);
-    }
+    private Sprite[] GetAnimFrames(HPCardType t) =>
+        t == HPCardType.GPT ? gptFrames : monsterFrames;
 }

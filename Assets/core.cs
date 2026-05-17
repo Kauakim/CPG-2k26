@@ -352,7 +352,7 @@ public class core : MonoBehaviour
     public const int LOBBY_COUNTDOWN = 3;
     public const int MAX_PLAYERS = 8;
     public const int MIN_PLAYERS = 2;
-    public const string FIXED_QUESTION = "Quanto \u00e9 7 \u00d7 8?";
+    public const string FIXED_QUESTION = "7 \u00d7 8?";
     public const string FIXED_ANSWER = "56";
 
     [Header("Optional")]
@@ -1489,8 +1489,6 @@ public class core : MonoBehaviour
         }
         currentQuestionText = FormatQuestionText(currentExpression.Text);
         currentAnswerValue  = currentExpression.Value;
-        lastAnswerCorrect = false;
-        hasPreviousAnswer = false;
     }
 
     private IEnumerator ShakeRoutine()

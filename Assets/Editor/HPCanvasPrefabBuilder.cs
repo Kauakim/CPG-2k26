@@ -128,8 +128,8 @@ public static class HPCanvasPrefabBuilder
 
         GameObject qTextGO = Child("QuestionText", qPanel.transform);
         Anchored(qTextGO, C, C, C, new Vector2(0f, 40f), new Vector2(800f, 80f));
-        Text qText = Txt(qTextGO, font, "Quanto é: ? = ?", 32, FontStyle.Bold,
-                          TextAnchor.MiddleCenter, Color.white);
+        Text qText = Txt(qTextGO, font, "", 32, FontStyle.Bold,
+                  TextAnchor.MiddleCenter, Color.white);
         qText.horizontalOverflow = HorizontalWrapMode.Overflow;
 
         InputField answerInput = MakeInputField("AnswerInput", qPanel.transform, font);

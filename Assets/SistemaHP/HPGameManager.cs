@@ -18,7 +18,7 @@ public class HPGameManager : MonoBehaviour
     [SerializeField] private float timerPenalty            = 5f;
     [SerializeField] private float cardEarnThreshold      = 5f;
     [SerializeField] private int   lobbyCountdownSeconds   = 3;
-    [SerializeField] private float lobbyWaitSeconds        = 60f;
+    [SerializeField] private float lobbyWaitSeconds        = 3f;
     [SerializeField] private float botAnswerDelayMin       = 1.2f;
     [SerializeField] private float botAnswerDelayMax       = 2.4f;
     [SerializeField] private bool  autoAddLocalPlayer      = true;
@@ -40,9 +40,10 @@ public class HPGameManager : MonoBehaviour
     // ── Sub-sistemas ──────────────────────────────────────────────────────────
 
     [Header("Sub-sistemas")]
-    [SerializeField] private HPTimerSystem    timerSystem;
-    [SerializeField] private HPMusicSystem    musicSystem;
-    [SerializeField] private HPQuestionSystem questionSystem;
+    [SerializeField] private HPTimerSystem       timerSystem;
+    [SerializeField] private HPMusicSystem       musicSystem;
+    [SerializeField] private HPQuestionSystem    questionSystem;
+    [SerializeField] private HPVignetteController vignetteController;
 
     // ── Views de UI ───────────────────────────────────────────────────────────
 
@@ -113,7 +114,6 @@ public class HPGameManager : MonoBehaviour
     private Coroutine botRoutine;
     private Coroutine cardChoiceAutoRoutine;
     private Coroutine shakeRoutine;
-    private Coroutine passRoutine;      // armazenado para poder ser cancelado no reset
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -162,33 +162,19 @@ public class HPGameManager : MonoBehaviour
     {
         if (phase != HPPhase.Lobby) return;
 
-        if (players.Count < minPlayers)
+        if (players.Count >= minPlayers)
         {
-            lobbyWaitTimer = 0f;
-            RefreshLobbyView();
-            return;
-        }
-
-        lobbyWaitTimer += Time.deltaTime;
-        bool  roomFull  = players.Count >= maxPlayers;
-        float remaining = Mathf.Max(0f, lobbyWaitSeconds - lobbyWaitTimer);
-
-        if (roomFull || remaining <= lobbyCountdownSeconds)
-        {
-            StartGameCountdown();
+            lobbyWaitTimer += Time.deltaTime;
+            int remaining = Mathf.CeilToInt(Mathf.Max(0f, lobbyWaitSeconds - lobbyWaitTimer));
+            lobbyView?.ShowLobby(players.Count, maxPlayers, remaining, players.Count < maxPlayers);
+            if (lobbyWaitTimer >= lobbyWaitSeconds)
+                StartGameCountdown();
         }
         else
         {
-            // Espera normal: exibe tempo restante
-            lobbyView?.ShowLobby(players.Count, maxPlayers,
-                                 Mathf.CeilToInt(remaining),
-                                 players.Count < maxPlayers);
+            lobbyWaitTimer = 0f;
+            RefreshLobbyView();
         }
-    }
-
-    private void StartGameImmediate()
-    {
-        StartGameCountdown();
     }
 
     private void RefreshLobbyView()
@@ -270,6 +256,7 @@ public class HPGameManager : MonoBehaviour
         botsAnswerAutomatically = true;
         totalGameTime = 0f;
         musicSystem?.StartMusic();
+        vignetteController?.StartGame();
         currentPlayerIndex    = -1;
         forcedNextPlayerIndex = Random.Range(0, players.Count);
         questionView?.ShowBoard();
@@ -320,8 +307,6 @@ public class HPGameManager : MonoBehaviour
         // Acende luz no jogador ativo
         yield return new WaitForSeconds(0.275f);
         sceneBridge?.SetActivePlayer(currentPlayerIndex);
-        sceneBridge?.SetArrowTarget(currentPlayerIndex);      // seta giratória aponta para o jogador
-        sceneBridge?.SetDerraunde(currentPlayerIndex);        // DERRAUNDE gira para o jogador atual
         RefreshActivePlayerView();
 
         // Pergunta
@@ -417,12 +402,6 @@ public class HPGameManager : MonoBehaviour
             {
                 consecutiveWrong    = 0;
                 resetExpressionNext = true;
-                currentExpression   = new HPQuestionSystem.ExpressionState();
-                PrepareQuestion();
-                if (player.IsLocal)
-                    questionView?.Show(player.Name, currentQuestionText, true);
-                else
-                    questionView?.ShowForBot(currentQuestionText);
             }
         }
     }
@@ -487,7 +466,6 @@ public class HPGameManager : MonoBehaviour
         {
             GiveCard(cardChoicePlayer, cardType);
             cardView.ShowFloatingCard(cardChoicePlayer.Name);
-            UpdateCardButtons();
         }
         cardChoicePlayer = null;
         FinishLifeLossFlow();
@@ -503,10 +481,8 @@ public class HPGameManager : MonoBehaviour
     {
         if (player.HeldCard == HPCardType.None)
             player.HeldCard = cardType;
-        else if (player.HeldCard2 == HPCardType.None)
-            player.HeldCard2 = cardType;
         else
-            return;
+            player.HeldCard2 = cardType;
 
         int idx = players.IndexOf(player);
         if (idx >= 0 && player.View != null)
@@ -587,12 +563,11 @@ public class HPGameManager : MonoBehaviour
             return;
         }
 
-        // Mostra painel mas não bloqueia — o próximo turno já pode começar.
+        // Mostra painel mas não bloqueia — o próximo turno já pode começar
         cardChoicePlayer = player;
         cardView.ShowChoice(player.Name, optA, optB, OnCardChosenFast);
         if (cardChoiceAutoRoutine != null) StopCoroutine(cardChoiceAutoRoutine);
         cardChoiceAutoRoutine = StartCoroutine(CardChoiceTimeoutNoCard(cardChoiceTimeout));
-        PassTurnSoon(0.35f);
     }
 
     private void OnCardChosenFast(HPCardType cardType)
@@ -602,7 +577,6 @@ public class HPGameManager : MonoBehaviour
         {
             GiveCard(cardChoicePlayer, cardType);
             cardView.ShowFloatingCard(cardChoicePlayer.Name);
-            UpdateCardButtons();
         }
         cardChoicePlayer = null;
         cardView?.HideChoice();
@@ -634,13 +608,13 @@ public class HPGameManager : MonoBehaviour
 
     private void UseCardFromSlot(int slot)
     {
-        if (phase != HPPhase.Playing) return;
-        // Cartas podem ser usadas a qualquer momento — busca o jogador local diretamente
-        HPPlayer localPlayer = GetLocalPlayer();
-        if (localPlayer == null || !localPlayer.Alive) return;
-        HPCardType card = slot == 0 ? localPlayer.HeldCard : localPlayer.HeldCard2;
+        if (phase != HPPhase.Playing || resolvingTurn) return;
+        if (currentPlayerIndex < 0 || currentPlayerIndex >= players.Count) return;
+        HPPlayer player = players[currentPlayerIndex];
+        if (!player.IsLocal) return;
+        HPCardType card = slot == 0 ? player.HeldCard : player.HeldCard2;
         if (card == HPCardType.None) return;
-        UseCard(localPlayer, card, slot == 0);
+        UseCard(player, card, slot == 0);
     }
 
     private void UseCard(HPPlayer player, HPCardType cardType, bool isFirstSlot)
@@ -795,8 +769,7 @@ public class HPGameManager : MonoBehaviour
         SetTargetSelection(false);
         UpdateCardButtons();
         StopBotRoutine();
-        if (passRoutine != null) { StopCoroutine(passRoutine); passRoutine = null; }
-        passRoutine = StartCoroutine(PassTurnRoutine(delay));
+        StartCoroutine(PassTurnRoutine(delay));
     }
 
     private IEnumerator PassTurnRoutine(float delay)
@@ -804,7 +777,6 @@ public class HPGameManager : MonoBehaviour
         timerSystem?.StopTimer();
         UpdateCardButtons();
         yield return new WaitForSeconds(delay);
-        passRoutine = null;
         StartNextTurn();
     }
 
@@ -819,6 +791,7 @@ public class HPGameManager : MonoBehaviour
         cardView?.HideChoice();
         timerSystem?.StopTimer();
         musicSystem?.StopMusic();
+        vignetteController?.ResetVignette();
         sceneBridge?.SetActivePlayer(-1);
         RefreshAllSeats(false);
         if (useCardButton1 != null) useCardButton1.gameObject.SetActive(false);
@@ -864,6 +837,7 @@ public class HPGameManager : MonoBehaviour
         opChoiceView?.Hide();
         resultView?.Hide();
         musicSystem?.StopMusic();
+        vignetteController?.ResetVignette();
         sceneBridge?.ResetAll();
 
         if (autoAddLocalPlayer) AddLocalPlayer();
@@ -925,18 +899,16 @@ public class HPGameManager : MonoBehaviour
 
         bool show = phase == HPPhase.Playing;
         btn.gameObject.SetActive(show);
-        if (!show) { if (icon != null) icon.color = Color.clear; return; }
-
-        // Botões visíveis para o jogador local em qualquer momento
-        HPPlayer localPlayer = GetLocalPlayer();
-        if (localPlayer == null || !localPlayer.Alive)
+        if (!show || currentPlayerIndex < 0 || currentPlayerIndex >= players.Count)
         {
             if (icon != null) icon.color = Color.clear;
-            btn.interactable = false;
             return;
         }
 
-        HPCardType cardType = slot == 0 ? localPlayer.HeldCard : localPlayer.HeldCard2;
+        HPPlayer player = players[currentPlayerIndex];
+        if (!player.IsLocal) { btn.gameObject.SetActive(false); return; }
+
+        HPCardType cardType = slot == 0 ? player.HeldCard : player.HeldCard2;
         if (cardType == HPCardType.None)
         {
             if (icon != null) icon.color = Color.clear;
@@ -946,34 +918,26 @@ public class HPGameManager : MonoBehaviour
 
         Sprite spr = GetCardButtonSprite(cardType);
         if (icon != null) { icon.sprite = spr; icon.color = spr != null ? Color.white : Color.clear; }
-        btn.interactable = !selectingAtestadoTarget && CanUseCard(localPlayer, cardType);
+        btn.interactable = !resolvingTurn && !selectingAtestadoTarget && CanUseCard(player, cardType);
     }
 
     private bool CanUseCard(HPPlayer player, HPCardType cardType)
     {
         switch (cardType)
         {
-            case HPCardType.NP3:
-                return player.Lives < 3 && player.Lives > 1;
-            case HPCardType.Atestado:
-                return AliveCount() > 1 && !resolvingTurn;
-            case HPCardType.Monster:
-                // Monster só faz sentido quando há um timer rodando
-                return timerSystem != null && timerSystem.Running && timerSystem.Remaining > 0f;
-            case HPCardType.GPT:
-                // GPT só funciona na vez do jogador local (ele responde a pergunta atual)
-                return !resolvingTurn
-                    && currentPlayerIndex >= 0
-                    && currentPlayerIndex < players.Count
-                    && players[currentPlayerIndex] == player;
-            default:
-                return false;
+            case HPCardType.NP3:      return player.Lives < 3 && player.Lives > 1;
+            case HPCardType.Atestado: return AliveCount() > 1;
+            case HPCardType.Monster:  return timerSystem != null && timerSystem.Running && timerSystem.Remaining > 0f;
+            case HPCardType.GPT:      return true;
+            default:                  return false;
         }
     }
 
     private Sprite GetCardButtonSprite(HPCardType cardType)
     {
-        return cardView != null ? cardView.GetIconSprite(cardType) : null;
+        // Os ícones de cartas vêm do HPCardView — reutiliza se disponível
+        // Como alternativa, pode-se adicionar [SerializeField] próprio aqui.
+        return null;
     }
 
     // ── UI de última resposta ─────────────────────────────────────────────────
@@ -1062,14 +1026,6 @@ public class HPGameManager : MonoBehaviour
         return null;
     }
 
-    /// Retorna o HPPlayer local, independentemente de quem está jogando no momento.
-    private HPPlayer GetLocalPlayer()
-    {
-        for (int i = 0; i < players.Count; i++)
-            if (players[i].IsLocal) return players[i];
-        return null;
-    }
-
     private int GetNextAliveIndex(int from)
     {
         if (players.Count == 0) return -1;
@@ -1099,6 +1055,5 @@ public class HPGameManager : MonoBehaviour
         if (cardChoiceAutoRoutine != null) { StopCoroutine(cardChoiceAutoRoutine); cardChoiceAutoRoutine = null; }
         if (turnRoutine           != null) { StopCoroutine(turnRoutine);           turnRoutine = null; }
         if (shakeRoutine          != null) { StopCoroutine(shakeRoutine);          shakeRoutine = null; }
-        if (passRoutine           != null) { StopCoroutine(passRoutine);           passRoutine = null; }
     }
 }

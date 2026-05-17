@@ -40,8 +40,7 @@ public class HPQuestionSystem : MonoBehaviour
         if (!expr.HasValue || resetExpression)
             expr = GenerateBase(turnCount);
 
-        string question = "Quanto é: " + expr.Text + " = ?";
-        return (question, expr.Value, expr);
+        return (expr.Text, expr.Value, expr);
     }
 
     // ── Geração de opções de operação (painel "Como complicar?") ──────────────

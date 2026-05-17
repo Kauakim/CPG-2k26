@@ -42,7 +42,7 @@ public class HPPlayer
 {
     public string Name;
     public bool IsLocal;
-    public int Lives = 2;
+    public int Lives = 3;
     public HPCardType HeldCard  = HPCardType.None;
     public HPCardType HeldCard2 = HPCardType.None;
     public bool Eliminated;
