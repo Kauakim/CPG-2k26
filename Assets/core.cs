@@ -21,7 +21,8 @@ public enum HotPotatoCardType
     NP3,
     Atestado,
     Monster,
-    GPT
+    GPT,
+    Calculadora
 }
 
 public static class HotPotatoCardInfo
@@ -38,6 +39,8 @@ public static class HotPotatoCardInfo
                 return "MONSTER";
             case HotPotatoCardType.GPT:
                 return "GPT";
+            case HotPotatoCardType.Calculadora:
+                return "CALCULADORA";
             default:
                 return "";
         }
@@ -48,13 +51,15 @@ public static class HotPotatoCardInfo
         switch (cardType)
         {
             case HotPotatoCardType.NP3:
-                return "+1 vida se estiver com 2 vidas.";
+                return "Recuperar vida";
             case HotPotatoCardType.Atestado:
-                return "Redireciona a seta para outro jogador.";
+                return "Passar a vez";
             case HotPotatoCardType.Monster:
-                return "Dobra o tempo restante da pergunta.";
+                return "Desacelar o tempo";
             case HotPotatoCardType.GPT:
-                return "Resolve a questao e passa a vez.";
+                return "Resolver a questao";
+            case HotPotatoCardType.Calculadora:
+                return "Recomeça a operação";
             default:
                 return "";
         }
@@ -102,6 +107,7 @@ public class HotPotatoSeatView
     public Sprite CardAtestado;
     public Sprite CardMonster;
     public Sprite CardGPT;
+    public Sprite CardCalculadora;
 
     private readonly Color aliveColor = Color.clear;
     private readonly Color emptyColor = Color.clear;
@@ -191,6 +197,9 @@ public class HotPotatoSeatView
             case HotPotatoCardType.GPT:
                 sprite = CardGPT;
                 break;
+            case HotPotatoCardType.Calculadora:
+                sprite = CardCalculadora;
+                break;
         }
 
         if (CardImage != null && sprite != null)
@@ -231,10 +240,11 @@ public class HotPotatoSeatView
         Sprite sprite = null;
         switch (cardType)
         {
-            case HotPotatoCardType.NP3:      sprite = CardNP3; break;
-            case HotPotatoCardType.Atestado: sprite = CardAtestado; break;
-            case HotPotatoCardType.Monster:  sprite = CardMonster; break;
-            case HotPotatoCardType.GPT:      sprite = CardGPT; break;
+            case HotPotatoCardType.NP3:             sprite = CardNP3; break;
+            case HotPotatoCardType.Atestado:        sprite = CardAtestado; break;
+            case HotPotatoCardType.Monster:         sprite = CardMonster; break;
+            case HotPotatoCardType.GPT:             sprite = CardGPT; break;
+            case HotPotatoCardType.Calculadora:     sprite = CardCalculadora; break;
         }
         if (sprite != null) SideCardImage.sprite = sprite;
         SideCardImage.gameObject.SetActive(sprite != null);
@@ -328,6 +338,7 @@ public class core : MonoBehaviour
     private const string CARD_ATESTADO_PATH = "Images/Cards/atestado";
     private const string CARD_MONSTER_PATH = "Images/Cards/MONSTER";
     private const string CARD_GPT_PATH = "Images/Cards/GPT";
+    private const string CARD_CALCULADORA_PATH = "Images/Cards/Calculadora";
     private const string LIFE_0_PATH = "Images/LifeBar/LIFE 0 DE 3";
     private const string LIFE_1_PATH = "Images/LifeBar/LIFE 1 DE 3";
     private const string LIFE_2_PATH = "Images/LifeBar/LIFE 2 DE 3";
@@ -354,6 +365,25 @@ public class core : MonoBehaviour
     [SerializeField] private bool localPlayerView = false;
     [SerializeField] private bool autoAddLocalPlayer = true;
     [SerializeField] private string localPlayerName = "Voce";
+
+    [Header("Tamanhos — HUD gerado")]
+    [SerializeField] private Vector2 timerSize           = new Vector2(120f,  60f);
+    [SerializeField] private Vector2 addBotButtonSize    = new Vector2(230f,  52f);
+    [SerializeField] private Vector2 cardSlotSize        = new Vector2(140f, 140f);
+    [SerializeField] private Vector2 lastAnswerSize      = new Vector2(320f,  80f);
+    [SerializeField] private Vector2 suddenDeathSize     = new Vector2(620f,  80f);
+    [SerializeField] private Vector2 lobbyTopSize        = new Vector2(800f,  80f);
+    [SerializeField] private Vector2 startCountdownSize  = new Vector2(800f, 140f);
+
+    [Header("Tamanhos — Seta / Batata (modo procedural)")]
+    [SerializeField] private Vector2 arrowSize      = new Vector2(120f, 120f);
+    [SerializeField] private Vector2 derraUndeSize  = new Vector2( 90f,  90f);
+
+    [Header("Tamanhos — Seat procedural (fallback)")]
+    [SerializeField] private Vector2 seatSize       = new Vector2(150f, 130f);
+    [SerializeField] private Vector2 avatarSize     = new Vector2( 70f,  70f);
+    [SerializeField] private Vector2 livesImageSize = new Vector2(120f,  38f);
+    [SerializeField] private Vector2 sideCardSize   = new Vector2( 38f,  38f);
 
     private readonly List<HotPotatoPlayer> players = new List<HotPotatoPlayer>();
     private readonly List<HotPotatoSeatView> seatViews = new List<HotPotatoSeatView>();
@@ -387,6 +417,7 @@ public class core : MonoBehaviour
     private Sprite cardAtestadoSprite;
     private Sprite cardMonsterSprite;
     private Sprite cardGptSprite;
+    private Sprite cardCalculadoraSprite;
     private Sprite life0Sprite;
     private Sprite life1Sprite;
     private Sprite life2Sprite;
@@ -443,6 +474,9 @@ public class core : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
+        // Não inicializa se o novo sistema (HPGameManager) já está na cena
+        if (FindObjectOfType<HPGameManager>() != null) return;
+
         if (FindObjectOfType<core>() == null)
         {
             new GameObject("HotPotatoGame").AddComponent<core>();
@@ -505,20 +539,21 @@ public class core : MonoBehaviour
 
     private void Start()
     {
-        backgroundSprite   = LoadSprite(BACKGROUND_PATH);
-        arrowSprite        = LoadSprite(ARROW_PATH);
-        quadroSprite       = LoadSprite(QUADRO_PATH);
-        derraUndeSprite    = LoadSprite(DERRAUNDE_PATH);
-        musicClip          = Resources.Load<AudioClip>(MUSIC_PATH);
+        backgroundSprite        = LoadSprite(BACKGROUND_PATH);
+        arrowSprite             = LoadSprite(ARROW_PATH);
+        quadroSprite            = LoadSprite(QUADRO_PATH);
+        derraUndeSprite         = LoadSprite(DERRAUNDE_PATH);
+        musicClip               = Resources.Load<AudioClip>(MUSIC_PATH);
         if (musicClip != null) musicSystem.ChangeMusic(musicClip);
-        life0Sprite        = LoadSprite(LIFE_0_PATH);
-        life1Sprite        = LoadSprite(LIFE_1_PATH);
-        life2Sprite        = LoadSprite(LIFE_2_PATH);
-        lifeFullSprite     = LoadSprite(LIFE_FULL_PATH);
-        cardNp3Sprite      = LoadSprite(CARD_NP3_PATH);
-        cardAtestadoSprite = LoadSprite(CARD_ATESTADO_PATH);
-        cardMonsterSprite  = LoadSprite(CARD_MONSTER_PATH);
-        cardGptSprite      = LoadSprite(CARD_GPT_PATH);
+        life0Sprite             = LoadSprite(LIFE_0_PATH);
+        life1Sprite             = LoadSprite(LIFE_1_PATH);
+        life2Sprite             = LoadSprite(LIFE_2_PATH);
+        lifeFullSprite          = LoadSprite(LIFE_FULL_PATH);
+        cardNp3Sprite           = LoadSprite(CARD_NP3_PATH);
+        cardAtestadoSprite      = LoadSprite(CARD_ATESTADO_PATH);
+        cardMonsterSprite       = LoadSprite(CARD_MONSTER_PATH);
+        cardGptSprite           = LoadSprite(CARD_GPT_PATH);
+        cardCalculadoraSprite   = LoadSprite(CARD_CALCULADORA_PATH);
 
         glassBreakClip = Resources.Load<AudioClip>("Songs/vidroquebrando");
         gepetoClip     = Resources.Load<AudioClip>("Songs/gepeto");
@@ -577,7 +612,6 @@ public class core : MonoBehaviour
         }
 
         HotPotatoPlayer player = new HotPotatoPlayer();
-        player.Name = "Bot " + GetNextBotNumber();
         player.IsLocal = false;
         player.View = seatViews[players.Count];
         players.Add(player);
@@ -607,7 +641,6 @@ public class core : MonoBehaviour
         }
 
         HotPotatoPlayer player = new HotPotatoPlayer();
-        player.Name = string.IsNullOrEmpty(localPlayerName) ? "Voce" : localPlayerName;
         player.IsLocal = true;
         player.View = seatViews[players.Count];
         players.Add(player);
@@ -651,7 +684,7 @@ public class core : MonoBehaviour
         bool correct = System.Math.Abs(Round2(expectedValue) - submittedValue) < 0.05;
         if (correct)
         {
-            UpdateLastAnswer(player.Name, submittedAnswer, true);
+            UpdateLastAnswer(submittedAnswer, true);
             hasPreviousAnswer = true;
         }
 
@@ -1062,7 +1095,7 @@ public class core : MonoBehaviour
         return "{" + expression + "}";
     }
 
-    private void UpdateLastAnswer(string playerName, string answer, bool correct)
+    private void UpdateLastAnswer(string answer, bool correct)
     {
         if (lastAnswerText == null)
         {
@@ -1242,6 +1275,7 @@ public class core : MonoBehaviour
         options.Add(HotPotatoCardType.Atestado);
         options.Add(HotPotatoCardType.Monster);
         options.Add(HotPotatoCardType.GPT);
+        options.Add(HotPotatoCardType.Calculadora);
         return options;
     }
 
@@ -1490,7 +1524,7 @@ public class core : MonoBehaviour
 
     private bool CanUseNP3(HotPotatoPlayer player)
     {
-        return player != null && player.Lives < 3 && player.Lives > 1;
+        return player != null && player.Lives < 3;
     }
 
 
@@ -1529,7 +1563,7 @@ public class core : MonoBehaviour
         cardSystem.PlayUseAnimation(HotPotatoCardType.GPT);
         if (sfxSource != null && gepetoClip != null) sfxSource.PlayOneShot(gepetoClip);
         ConsumeCard(player, isFirstSlot);
-        UpdateLastAnswer(player.Name, "GPT", true);
+        UpdateLastAnswer("GPT", true);
         questionPanel.SetInteractable(false);
         PassTurnSoon(0.35f);
     }
@@ -1580,6 +1614,7 @@ public class core : MonoBehaviour
             case HotPotatoCardType.Atestado: return cardAtestadoSprite;
             case HotPotatoCardType.Monster:  return cardMonsterSprite;
             case HotPotatoCardType.GPT:      return cardGptSprite;
+            case HotPotatoCardType.Calculadora:      return cardCalculadoraSprite;
             default: return null;
         }
     }
@@ -1592,7 +1627,7 @@ public class core : MonoBehaviour
         slotRect.anchorMax = new Vector2(1f, 0f);
         slotRect.pivot = new Vector2(1f, 0f);
         slotRect.anchoredPosition = position;
-        slotRect.sizeDelta = new Vector2(140f, 140f);
+        slotRect.sizeDelta = cardSlotSize;
 
         Image slotBg = slotObject.AddComponent<Image>();
         slotBg.sprite = scene.CreateRoundedRectSprite(140, 140, 14, scene.Hex("#ffffff"), scene.Hex("#ffffff"), 0);
@@ -1728,6 +1763,8 @@ public class core : MonoBehaviour
                 return turnTimer.Running && turnTimer.Remaining > 0f;
             case HotPotatoCardType.GPT:
                 return true;
+            case HotPotatoCardType.Calculadora:
+                return true;    
             default:
                 return false;
         }
@@ -1903,7 +1940,7 @@ public class core : MonoBehaviour
         GameObject timerTextObject = scene.CreateUIObject("TimerText", table);
         RectTransform timerTextRect = timerTextObject.GetComponent<RectTransform>();
         timerTextRect.anchoredPosition = new Vector2(-120f, 80f);
-        timerTextRect.sizeDelta = new Vector2(120f, 60f);
+        timerTextRect.sizeDelta = timerSize;
         timerText = scene.CreateText(timerTextObject, "30", 48, font, TextAnchor.MiddleCenter, Color.white);
         timerText.fontStyle = FontStyle.Bold;
         turnTimer.Initialize(null, timerText);
@@ -1914,7 +1951,7 @@ public class core : MonoBehaviour
         buttonRect.anchorMax = new Vector2(0.5f, 0f);
         buttonRect.pivot = new Vector2(0.5f, 0f);
         buttonRect.anchoredPosition = new Vector2(0f, 100f);
-        buttonRect.sizeDelta = new Vector2(230f, 52f);
+        buttonRect.sizeDelta = addBotButtonSize;
         addBotButton = buttonObject.GetComponent<Button>();
 
         // Dois slots de carta no canto inferior direito, um em cima do outro
@@ -1935,7 +1972,7 @@ public class core : MonoBehaviour
         lastAnswerRect.anchorMax = new Vector2(0f, 0f);
         lastAnswerRect.pivot = new Vector2(0f, 0f);
         lastAnswerRect.anchoredPosition = new Vector2(28f, 24f);
-        lastAnswerRect.sizeDelta = new Vector2(320f, 80f);
+        lastAnswerRect.sizeDelta = lastAnswerSize;
 
         GameObject lastAnswerTextObject = scene.CreateUIObject("Text", lastAnswerObject.transform);
         RectTransform lastAnswerTextRect = lastAnswerTextObject.GetComponent<RectTransform>();
@@ -1951,7 +1988,7 @@ public class core : MonoBehaviour
         sdRect.anchorMax = new Vector2(0.5f, 0.5f);
         sdRect.pivot = new Vector2(0.5f, 0.5f);
         sdRect.anchoredPosition = new Vector2(0f, 180f);
-        sdRect.sizeDelta = new Vector2(620f, 80f);
+        sdRect.sizeDelta = suddenDeathSize;
         suddenDeathText = scene.CreateText(sdObject, "MORTE S\u00daBITA", 54, font, TextAnchor.MiddleCenter, scene.Hex("#ff274f"));
         suddenDeathText.fontStyle = FontStyle.Bold;
         sdObject.AddComponent<Shadow>().effectColor = new Color(0f, 0f, 0f, 0.85f);
@@ -1964,7 +2001,7 @@ public class core : MonoBehaviour
         lobbyTopRect.anchorMax = new Vector2(0.5f, 1f);
         lobbyTopRect.pivot = new Vector2(0.5f, 1f);
         lobbyTopRect.anchoredPosition = new Vector2(0f, -80f);
-        lobbyTopRect.sizeDelta = new Vector2(800f, 80f);
+        lobbyTopRect.sizeDelta = lobbyTopSize;
         
         lobbyText = scene.CreateText(lobbyTopObject, "", 28, font, TextAnchor.MiddleCenter, Color.white);
         lobbyText.fontStyle = FontStyle.Bold;
@@ -1977,7 +2014,7 @@ public class core : MonoBehaviour
         countdownTopRect.anchorMax = new Vector2(0.5f, 1f);
         countdownTopRect.pivot = new Vector2(0.5f, 1f);
         countdownTopRect.anchoredPosition = new Vector2(0f, -80f);
-        countdownTopRect.sizeDelta = new Vector2(800f, 140f);
+        countdownTopRect.sizeDelta = startCountdownSize;
         
         startCountdownText = scene.CreateText(countdownTopObject, "", 82, font, TextAnchor.MiddleCenter, scene.Hex("#ffdf4d"));
         startCountdownText.fontStyle = FontStyle.Bold;
@@ -1998,7 +2035,7 @@ public class core : MonoBehaviour
     {
         GameObject arrowObject = scene.CreateUIObject("Arrow", table);
         arrowPivot = arrowObject.GetComponent<RectTransform>();
-        arrowPivot.sizeDelta = new Vector2(120f, 120f);
+        arrowPivot.sizeDelta = arrowSize;
         arrowPivot.anchoredPosition = new Vector2(-15f, 10f);
 
         Image arrowImage = arrowObject.AddComponent<Image>();
@@ -2019,7 +2056,7 @@ public class core : MonoBehaviour
         // DERRAUNDE — batata sobre a mesa, movida para o jogador da vez
         GameObject derraUndeObject = scene.CreateUIObject("DerraUnde", table);
         derraUndePivot = derraUndeObject.GetComponent<RectTransform>();
-        derraUndePivot.sizeDelta = new Vector2(90f, 90f);
+        derraUndePivot.sizeDelta = derraUndeSize;
         derraUndePivot.anchoredPosition = new Vector2(-460f, -280f);
         derraUndeImage = derraUndeObject.AddComponent<Image>();
         derraUndeImage.preserveAspect = true;
@@ -2075,7 +2112,7 @@ public class core : MonoBehaviour
     {
         GameObject seatObject = scene.CreateUIObject(name, parent);
         RectTransform seatRect = seatObject.GetComponent<RectTransform>();
-        seatRect.sizeDelta = new Vector2(150f, 130f);
+        seatRect.sizeDelta = seatSize;
 
         CanvasGroup group = seatObject.AddComponent<CanvasGroup>();
 
@@ -2105,7 +2142,7 @@ public class core : MonoBehaviour
         // Vidas — acima do avatar
         GameObject livesImageObject = scene.CreateUIObject("LivesImage", seatRect);
         RectTransform livesImageRect = livesImageObject.GetComponent<RectTransform>();
-        livesImageRect.sizeDelta = new Vector2(120f, 38f);
+        livesImageRect.sizeDelta = livesImageSize;
         livesImageRect.anchoredPosition = new Vector2(0f, 40f);
         Image livesImage = livesImageObject.AddComponent<Image>();
         livesImage.preserveAspect = true;
@@ -2120,7 +2157,7 @@ public class core : MonoBehaviour
         // Avatar — centro
         GameObject avatarObject = scene.CreateUIObject("Avatar", seatRect);
         RectTransform avatarRect = avatarObject.GetComponent<RectTransform>();
-        avatarRect.sizeDelta = new Vector2(70f, 70f);
+        avatarRect.sizeDelta = avatarSize;
         avatarRect.anchoredPosition = new Vector2(0f, -4f);
         Image avatar = avatarObject.AddComponent<Image>();
         avatar.sprite = circleSprite;
@@ -2152,7 +2189,7 @@ public class core : MonoBehaviour
         float sideX = seatIndex < 4 ? 62f : -62f;
         GameObject sideCardObject = scene.CreateUIObject("SideCard", seatRect);
         RectTransform sideCardRect = sideCardObject.GetComponent<RectTransform>();
-        sideCardRect.sizeDelta = new Vector2(38f, 38f);
+        sideCardRect.sizeDelta = sideCardSize;
         sideCardRect.anchoredPosition = new Vector2(sideX, -4f);
         Image sideCardImage = sideCardObject.AddComponent<Image>();
         sideCardImage.preserveAspect = true;
@@ -2207,7 +2244,8 @@ public class core : MonoBehaviour
             CardNP3 = cardNp3Sprite,
             CardAtestado = cardAtestadoSprite,
             CardMonster = cardMonsterSprite,
-            CardGPT = cardGptSprite
+            CardGPT = cardGptSprite,
+            CardCalculadora = cardCalculadoraSprite
         };
     }
 
@@ -2245,7 +2283,8 @@ public class core : MonoBehaviour
             CardNP3       = cardNp3Sprite,
             CardAtestado  = cardAtestadoSprite,
             CardMonster   = cardMonsterSprite,
-            CardGPT       = cardGptSprite
+            CardGPT       = cardGptSprite,
+            CardCalculadora = cardCalculadoraSprite
         };
 
         return view;

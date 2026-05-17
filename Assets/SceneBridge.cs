@@ -47,11 +47,45 @@ public class SceneBridge : MonoBehaviour
         }
     }
 
+    [Header("Arrow / DERRAUNDE")]
+    [SerializeField] private Transform arrowPivot;
+    [SerializeField] private Transform derraUndeObject;
+    [SerializeField] private Vector3 derraUndeOffset = new Vector3(0f, 1.5f, 0f);
+
     /// Desliga a luz e oculta todos os personagens (estado inicial / lobby zerado).
     public void ResetAll()
     {
         if (spotLight != null) spotLight.enabled = false;
         SetPlayerCount(0);
+    }
+
+    /// Aponta a seta para o personagem do índice indicado.
+    public void SetArrowTarget(int playerIndex)
+    {
+        if (arrowPivot == null) return;
+        Transform target = GetCharacterTransform(playerIndex);
+        if (target == null) return;
+
+        Vector3 direction = target.position - arrowPivot.position;
+        if (direction.sqrMagnitude <= 0f) return;
+
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg - 90f;
+        arrowPivot.rotation = Quaternion.Euler(0f, 0f, angle);
+    }
+
+    /// Move o objeto DERRAUNDE para o personagem do índice indicado.
+    public void SetDerraunde(int playerIndex)
+    {
+        if (derraUndeObject == null) return;
+        Transform target = GetCharacterTransform(playerIndex);
+        if (target == null)
+        {
+            derraUndeObject.gameObject.SetActive(false);
+            return;
+        }
+
+        derraUndeObject.position = target.position + derraUndeOffset;
+        derraUndeObject.gameObject.SetActive(true);
     }
 
     /// Retorna o Transform do personagem no índice indicado (pode ser null).
