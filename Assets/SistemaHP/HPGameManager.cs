@@ -1,13 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using Photon.Pun;
+using Photon.Realtime;
+using ExitGames.Client.Photon;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// Orquestrador principal do jogo Hot Potato.
-/// Substitui core.cs — não cria nenhum elemento de UI em runtime.
-/// Todas as referências são atribuídas via Inspector.
-public class HPGameManager : MonoBehaviour
+/// Orquestrador principal do jogo Hot Potato — versão multiplayer Photon PUN2.
+/// Master Client = autoridade do jogo. Toda mudança de estado é enviada via RPC a todos.
+[RequireComponent(typeof(PhotonView))]
+public class HPGameManager : MonoBehaviourPun
 {
     // ── Configurações de jogo ─────────────────────────────────────────────────
 
@@ -19,9 +22,6 @@ public class HPGameManager : MonoBehaviour
     [SerializeField] private float cardEarnThreshold      = 5f;
     [SerializeField] private int   lobbyCountdownSeconds   = 3;
     [SerializeField] private float lobbyWaitSeconds        = 3f;
-    [SerializeField] private float botAnswerDelayMin       = 1.2f;
-    [SerializeField] private float botAnswerDelayMax       = 2.4f;
-    [SerializeField] private bool  autoAddLocalPlayer      = true;
     [SerializeField] private float opChoiceTimeout         = 5f;
     [SerializeField] private float cardChoiceTimeout       = 10f;
     [SerializeField] private int   suddenDeathAfterTurn    = 55;
@@ -103,17 +103,18 @@ public class HPGameManager : MonoBehaviour
     private int   currentTurnId;
     private bool  selectingAtestadoTarget;
     private bool  resolvingTurn;
-    private bool  botsAnswerAutomatically = true;
+
+    // ── Mapeamento Photon → HPPlayer ──────────────────────────────────────────
+    // Chave: actor number do Photon. Valor: índice na lista players.
+    private readonly Dictionary<int, int> actorToPlayerIndex = new Dictionary<int, int>();
 
     private float lobbyWaitTimer;
     private float totalGameTime;
 
-    private int botNameCounter = 1;
-
     private Coroutine turnRoutine;
-    private Coroutine botRoutine;
     private Coroutine cardChoiceAutoRoutine;
     private Coroutine shakeRoutine;
+    private Coroutine passRoutine;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -126,15 +127,9 @@ public class HPGameManager : MonoBehaviour
 
         questionView?.SetGame(this);
         resultView?.SetRestartAction(ResetToLobby);
-
-        if (lobbyView != null && lobbyView.AddBotButton != null)
-            lobbyView.AddBotButton.onClick.AddListener(AddBot);
-
         SetupCardButtons();
 
-        if (autoAddLocalPlayer) AddLocalPlayer();
-
-        RefreshLobbyView();
+        // Lobby permanece até o Photon confirmar entrada na sala (OnNetworkJoinedRoom)
         RefreshAllSeats(true);
     }
 
@@ -161,19 +156,45 @@ public class HPGameManager : MonoBehaviour
     private void HandleLobbyTimer()
     {
         if (phase != HPPhase.Lobby) return;
+        // Apenas o Master Client controla o timer do lobby
+        if (!PhotonNetwork.IsMasterClient) return;
 
-        if (players.Count >= minPlayers)
+        int seated = HPNetworkManager.Instance != null
+            ? HPNetworkManager.Instance.OccupiedSeatCount()
+            : players.Count;
+
+        if (seated < minPlayers)
         {
-            lobbyWaitTimer += Time.deltaTime;
-            int remaining = Mathf.CeilToInt(Mathf.Max(0f, lobbyWaitSeconds - lobbyWaitTimer));
-            lobbyView?.ShowLobby(players.Count, maxPlayers, remaining, players.Count < maxPlayers);
-            if (lobbyWaitTimer >= lobbyWaitSeconds)
-                StartGameCountdown();
+            lobbyWaitTimer = 0f;
+            photonView.RPC(nameof(RPC_SyncLobbyUI), RpcTarget.All,
+                           seated, maxPlayers, 0, false);
+            return;
+        }
+
+        // Sala cheia → 3s de countdown imediato
+        if (seated >= maxPlayers)
+        {
+            photonView.RPC(nameof(RPC_StartCountdown), RpcTarget.All);
+            return;
+        }
+
+        // 2–7 jogadores → 60s
+        lobbyWaitTimer += Time.deltaTime;
+        float remaining = Mathf.Max(0f, lobbyWaitSeconds - lobbyWaitTimer);
+
+        if (remaining <= 0f)
+        {
+            photonView.RPC(nameof(RPC_StartCountdown), RpcTarget.All);
+        }
+        else if (remaining <= lobbyCountdownSeconds)
+        {
+            photonView.RPC(nameof(RPC_SyncLobbyCountdown), RpcTarget.All,
+                           Mathf.CeilToInt(remaining));
         }
         else
         {
-            lobbyWaitTimer = 0f;
-            RefreshLobbyView();
+            photonView.RPC(nameof(RPC_SyncLobbyUI), RpcTarget.All,
+                           seated, maxPlayers, Mathf.CeilToInt(remaining), true);
         }
     }
 
@@ -206,35 +227,93 @@ public class HPGameManager : MonoBehaviour
 
     // ── Gerenciamento de jogadores ────────────────────────────────────────────
 
-    public void AddLocalPlayer()
+    // ── Callbacks do HPNetworkManager ─────────────────────────────────────────
+
+    /// Chamado pelo HPNetworkManager quando o jogador entra na sala.
+    public void OnNetworkJoinedRoom()
     {
-        if (players.Count >= maxPlayers || phase != HPPhase.Lobby) return;
-        AddPlayer(new HPPlayer { Name = "Jogador", IsLocal = true });
+        RefreshLobbyView();
+        RefreshCharacterVisuals();
     }
 
-    public void AddBot()
+    /// Atualiza a cor dos sprites dos personagens:
+    /// cinza = assento livre, branco = assento ocupado.
+    public void RefreshCharacterVisuals()
     {
-        if (players.Count >= maxPlayers || phase != HPPhase.Lobby) return;
-        AddPlayer(new HPPlayer { Name = "Bot " + botNameCounter++, IsLocal = false });
+        for (int i = 0; i < seatViews.Length; i++)
+        {
+            Transform slot = sceneBridge?.GetCharacterTransform(i);
+            if (slot == null) continue;
+
+            SpriteRenderer sr = slot.GetComponent<SpriteRenderer>();
+            if (sr == null) continue;
+
+            // Não sobrescreve a cor vermelha de eliminado
+            if (i < players.Count && players[i].Eliminated) continue;
+
+            bool taken = HPNetworkManager.Instance != null
+                      && HPNetworkManager.Instance.GetSeatOwner(i) != 0;
+
+            sr.color = taken
+                ? Color.white                            // escolhido → cor normal
+                : new Color(0.4f, 0.4f, 0.4f, 1f);     // livre → cinza
+        }
     }
 
-    private void AddPlayer(HPPlayer player)
+    /// Chamado pelo Master quando a contagem de jogadores muda.
+    public void OnNetworkPlayerCountChanged(int count)
     {
-        int index = players.Count;
-        if (index < seatViews.Length && seatViews[index] != null)
-            player.View = seatViews[index];
-        players.Add(player);
-        sceneBridge?.SetPlayerCount(players.Count);
-        RefreshAllSeats(true);
+        RefreshLobbyView();
+        RefreshCharacterVisuals();
     }
+
+    /// Chamado quando este cliente se torna o novo Master (migração).
+    public void OnBecameMaster()
+    {
+        Debug.Log("[HP] Este cliente se tornou o novo Master Client.");
+        // Se o jogo estava rodando, o novo master assume o estado atual
+    }
+
+    // ── Construção da lista de jogadores a partir do Photon ───────────────────
+
+    private void BuildPlayersFromPhoton()
+    {
+        players.Clear();
+        actorToPlayerIndex.Clear();
+
+        if (HPNetworkManager.Instance == null) return;
+
+        for (int seat = 0; seat < maxPlayers; seat++)
+        {
+            Photon.Realtime.Player photonPlayer =
+                HPNetworkManager.Instance.GetPlayerAtSeat(seat);
+            if (photonPlayer == null) continue;
+
+            var hp = new HPPlayer
+            {
+                Name    = photonPlayer.NickName,
+                IsLocal = photonPlayer.IsLocal,
+                Lives   = 3
+            };
+            if (seat < seatViews.Length && seatViews[seat] != null)
+                hp.View = seatViews[seat];
+
+            actorToPlayerIndex[photonPlayer.ActorNumber] = players.Count;
+            players.Add(hp);
+        }
+    }
+
+    // Mantidos para compatibilidade de Inspector (não fazem mais nada útil)
+    public void AddLocalPlayer() { }
+    public void AddBot()         { }
 
     // ── Lobby → Jogo ──────────────────────────────────────────────────────────
 
     private void StartGameCountdown()
     {
         if (phase != HPPhase.Lobby) return;
-        phase = HPPhase.LobbyCountdown;
-        StartCoroutine(CountdownRoutine());
+        if (!PhotonNetwork.IsMasterClient) return;
+        photonView.RPC(nameof(RPC_StartCountdown), RpcTarget.All);
     }
 
     private IEnumerator CountdownRoutine()
@@ -246,15 +325,20 @@ public class HPGameManager : MonoBehaviour
         }
         lobbyView?.ShowCountdown(0);
         yield return new WaitForSeconds(0.45f);
-        lobbyView?.HideAll();
-        BeginGame();
+
+        if (PhotonNetwork.IsMasterClient)
+            photonView.RPC(nameof(RPC_BeginGame), RpcTarget.All);
     }
 
     private void BeginGame()
     {
-        phase = HPPhase.Playing;
-        botsAnswerAutomatically = true;
+        phase         = HPPhase.Playing;
         totalGameTime = 0f;
+
+        BuildPlayersFromPhoton();
+        HPNetworkManager.Instance?.MarkGameStarted();
+
+        lobbyView?.HideAll();
         musicSystem?.StartMusic();
         vignetteController?.StartGame();
         currentPlayerIndex    = -1;
@@ -262,7 +346,9 @@ public class HPGameManager : MonoBehaviour
         questionView?.ShowBoard();
         RefreshAllSeats(false);
         UpdateCardButtons();
-        StartNextTurn();
+
+        if (PhotonNetwork.IsMasterClient)
+            StartNextTurn();
     }
 
     // ── Lógica de turno ───────────────────────────────────────────────────────
@@ -270,7 +356,6 @@ public class HPGameManager : MonoBehaviour
     private void StartNextTurn()
     {
         if (AliveCount() <= 1) { EndGame(); return; }
-        StopBotRoutine();
         if (turnRoutine != null) StopCoroutine(turnRoutine);
         turnRoutine = StartCoroutine(TurnRoutine());
     }
@@ -317,19 +402,19 @@ public class HPGameManager : MonoBehaviour
         // Incrementa o ID do turno antes de liberar resolvingTurn para que
         // qualquer BotRoutine de turno anterior seja descartada pelo guard.
         currentTurnId++;
-        int capturedTurnId = currentTurnId;
 
-        if (player.IsLocal)
-            questionView?.Show(player.Name, currentQuestionText, true);
-        else
-            questionView?.ShowForBot(currentQuestionText);   // não expõe nome/input do bot
+        // Master envia o turno para todos via RPC
+        // (answerValue como string pois Photon não serializa double nativamente)
+        photonView.RPC(nameof(RPC_BeginTurn), RpcTarget.All,
+            currentPlayerIndex,
+            currentQuestionText,
+            HPQuestionSystem.FormatAnswer(currentAnswerValue),
+            currentExpression.Text ?? "",
+            currentExpression.HasValue);
 
         timerSystem?.StartTimer(currentTimerMax);
         resolvingTurn = false;
         UpdateCardButtons();
-
-        if (botsAnswerAutomatically && !player.IsLocal)
-            ScheduleBotAnswer(0f, capturedTurnId);
     }
 
     private void PrepareQuestion()
@@ -354,8 +439,23 @@ public class HPGameManager : MonoBehaviour
 
     public void SubmitAnswer(string input)
     {
-        if (phase != HPPhase.Playing || resolvingTurn) return;
+        if (phase != HPPhase.Playing) return;
+
+        // Jogador local envia resposta ao Master para validação
+        photonView.RPC(nameof(RPC_RequestAnswer), RpcTarget.MasterClient, input);
+    }
+
+    [PunRPC]
+    private void RPC_RequestAnswer(string input, PhotonMessageInfo info)
+    {
+        // Só o Master valida
+        if (!PhotonNetwork.IsMasterClient) return;
+        if (resolvingTurn) return;
         if (currentPlayerIndex < 0 || currentPlayerIndex >= players.Count) return;
+
+        // Verifica se quem enviou é realmente o jogador da vez
+        if (actorToPlayerIndex.TryGetValue(info.Sender.ActorNumber, out int senderIdx))
+            if (senderIdx != currentPlayerIndex) return;
 
         HPPlayer player = players[currentPlayerIndex];
 
@@ -369,124 +469,49 @@ public class HPGameManager : MonoBehaviour
         {
             consecutiveWrong = 0;
             turnsWithoutLifeLoss++;
-            lastAnswerCorrect = true;
-            hasPreviousAnswer = true;
-            questionView?.SetInteractable(false);
-            StopBotRoutine();
-
-            // Ganhou carta se respondeu em menos de cardEarnThreshold segundos
             bool earnedCard = timerSystem != null && timerSystem.Elapsed < cardEarnThreshold;
-
-            // Pausa o timer durante a escolha de operação
             timerSystem?.StopTimer();
 
-            UpdateLastAnswer(player.Name, input);
+            // Broadcast resultado correto para todos
+            photonView.RPC(nameof(RPC_OnAnswerCorrect), RpcTarget.All,
+                           currentPlayerIndex, input, earnedCard);
 
             if (currentExpression.HasValue && questionSystem != null)
-                OfferOperationChoice(player, earnedCard);
+            {
+                string[] ops = questionSystem.GenerateOperationOptions(turnCount, currentExpression);
+                // Envia opções de operação para o jogador que acertou
+                photonView.RPC(nameof(RPC_ShowOperationChoice), RpcTarget.All,
+                               currentPlayerIndex, ops, earnedCard);
+            }
             else
             {
-                if (earnedCard) StartCardOfferForPlayer(player);
-                PassTurnSoon(0.35f);
+                if (earnedCard) MasterGiveCard(player, currentPlayerIndex);
+                photonView.RPC(nameof(RPC_PassTurn), RpcTarget.All, 0.35f);
             }
         }
         else
         {
             consecutiveWrong++;
             turnsWithoutLifeLoss = 0;
-            PlaySfx(vidroClip);               // som de erro imediato
-            timerSystem?.Penalize(timerPenalty);
-
-            // A cada 2 erros consecutivos reseta a expressão
             if (consecutiveWrong >= 2)
             {
                 consecutiveWrong    = 0;
                 resetExpressionNext = true;
             }
+            photonView.RPC(nameof(RPC_OnAnswerWrong), RpcTarget.All,
+                           currentPlayerIndex, timerPenalty);
         }
     }
 
     // ── Vida perdida ──────────────────────────────────────────────────────────
 
+    // ApplyLifeLoss local — apenas para uso interno no RPC_ApplyLifeLoss
     private void ApplyLifeLoss(HPPlayer player)
     {
         player.Lives = Mathf.Max(0, player.Lives - 1);
-        if (player.Lives <= 0)
-            player.Eliminated = true;
+        if (player.Lives <= 0) player.Eliminated = true;
         if (shakeRoutine != null) StopCoroutine(shakeRoutine);
         shakeRoutine = StartCoroutine(ShakeRoutine());
-    }
-
-    private IEnumerator AfterLifeLossRoutine(HPPlayer player)
-    {
-        RefreshAllSeats(false);
-        questionView?.SetInteractable(false);
-        resetExpressionNext = true;
-        yield return new WaitForSeconds(1.15f);
-        FinishLifeLossFlow();
-    }
-
-    private void FinishLifeLossFlow()
-    {
-        if (AliveCount() <= 1)
-            EndGame();
-        else
-            StartNextTurn();
-    }
-
-    // ── Escolha de carta ──────────────────────────────────────────────────────
-
-    private void OfferCardChoice(HPPlayer player)
-    {
-        if (cardView == null || AliveCount() <= 1) { FinishLifeLossFlow(); return; }
-
-        cardChoicePlayer = player;
-        HPCardType optA = RandomCard();
-        HPCardType optB = RandomCardDifferentFrom(optA);
-
-        if (!player.IsLocal)
-        {
-            // Bot escolhe aleatoriamente
-            HPCardType picked = Random.value < 0.5f ? optA : optB;
-            GiveCard(player, picked);
-            cardView.ShowFloatingCard(player.Name);
-            FinishLifeLossFlow();
-            return;
-        }
-
-        if (cardChoiceAutoRoutine != null) StopCoroutine(cardChoiceAutoRoutine);
-        cardView.ShowChoice(player.Name, optA, optB, OnCardChosen);
-        cardChoiceAutoRoutine = StartCoroutine(CardChoiceTimeout(cardChoiceTimeout, optA));
-    }
-
-    private void OnCardChosen(HPCardType cardType)
-    {
-        if (cardChoiceAutoRoutine != null) { StopCoroutine(cardChoiceAutoRoutine); cardChoiceAutoRoutine = null; }
-        if (cardChoicePlayer != null)
-        {
-            GiveCard(cardChoicePlayer, cardType);
-            cardView.ShowFloatingCard(cardChoicePlayer.Name);
-        }
-        cardChoicePlayer = null;
-        FinishLifeLossFlow();
-    }
-
-    private IEnumerator CardChoiceTimeout(float timeout, HPCardType autoChoice)
-    {
-        yield return new WaitForSeconds(timeout);
-        OnCardChosen(autoChoice);
-    }
-
-    private void GiveCard(HPPlayer player, HPCardType cardType)
-    {
-        if (player.HeldCard == HPCardType.None)
-            player.HeldCard = cardType;
-        else
-            player.HeldCard2 = cardType;
-
-        int idx = players.IndexOf(player);
-        if (idx >= 0 && player.View != null)
-            player.View.SetPlayer(player, idx + 1);
     }
 
     private static HPCardType RandomCard()
@@ -502,91 +527,11 @@ public class HPGameManager : MonoBehaviour
         return pick;
     }
 
-    // ── Escolha de operação ───────────────────────────────────────────────────
-
-    private void OfferOperationChoice(HPPlayer player, bool offerCardAfter = false)
-    {
-        if (opChoiceView == null || questionSystem == null)
-        {
-            if (offerCardAfter) StartCardOfferForPlayer(player);
-            PassTurnSoon(0.35f);
-            return;
-        }
-
-        string[] options = questionSystem.GenerateOperationOptions(turnCount, currentExpression);
-
-        if (!player.IsLocal)
-        {
-            ApplyOperation(options[Random.Range(0, options.Length)]);
-            if (offerCardAfter) StartCardOfferForPlayer(player);
-            PassTurnSoon(0.35f);
-            return;
-        }
-
-        opChoiceView.Show(options, opChoiceTimeout, op =>
-        {
-            ApplyOperation(op);
-            if (offerCardAfter) StartCardOfferForPlayer(player);
-            PassTurnSoon(0.35f);
-        });
-    }
-
-    private void ApplyOperation(string op)
-    {
-        if (questionSystem == null) return;
-        currentExpression   = questionSystem.ApplyChosenOperation(currentExpression, op);
-        currentQuestionText = "Quanto é: " + currentExpression.Text + " = ?";
-        currentAnswerValue  = currentExpression.Value;
-
-        // Só atualiza o quadro em tempo real quando o jogador local escolheu a operação.
-        // Para bots, o quadro é atualizado ao início do próximo turno via Show/ShowForBot.
-        bool localIsChooser = currentPlayerIndex >= 0
-                           && currentPlayerIndex < players.Count
-                           && players[currentPlayerIndex].IsLocal;
-        if (localIsChooser)
-            questionView?.UpdateQuestion(currentQuestionText);
-    }
-
-    // ── Oferta de carta por resposta rápida (não bloqueia próximo turno) ──────
-
-    private void StartCardOfferForPlayer(HPPlayer player)
-    {
-        if (cardView == null) return;
-
-        HPCardType optA = RandomCard();
-        HPCardType optB = RandomCardDifferentFrom(optA);
-
-        if (!player.IsLocal)
-        {
-            GiveCard(player, Random.value < 0.5f ? optA : optB);
-            cardView.ShowFloatingCard(player.Name);
-            return;
-        }
-
-        // Mostra painel mas não bloqueia — o próximo turno já pode começar
-        cardChoicePlayer = player;
-        cardView.ShowChoice(player.Name, optA, optB, OnCardChosenFast);
-        if (cardChoiceAutoRoutine != null) StopCoroutine(cardChoiceAutoRoutine);
-        cardChoiceAutoRoutine = StartCoroutine(CardChoiceTimeoutNoCard(cardChoiceTimeout));
-    }
-
-    private void OnCardChosenFast(HPCardType cardType)
-    {
-        if (cardChoiceAutoRoutine != null) { StopCoroutine(cardChoiceAutoRoutine); cardChoiceAutoRoutine = null; }
-        if (cardChoicePlayer != null)
-        {
-            GiveCard(cardChoicePlayer, cardType);
-            cardView.ShowFloatingCard(cardChoicePlayer.Name);
-        }
-        cardChoicePlayer = null;
-        cardView?.HideChoice();
-    }
-
     private IEnumerator CardChoiceTimeoutNoCard(float timeout)
     {
         yield return new WaitForSeconds(timeout);
         cardChoicePlayer = null;
-        cardView?.HideChoice(); // tempo esgotou, não ganha carta
+        cardView?.HideChoice();
         cardChoiceAutoRoutine = null;
     }
 
@@ -608,66 +553,28 @@ public class HPGameManager : MonoBehaviour
 
     private void UseCardFromSlot(int slot)
     {
-        if (phase != HPPhase.Playing || resolvingTurn) return;
-        if (currentPlayerIndex < 0 || currentPlayerIndex >= players.Count) return;
+        if (phase != HPPhase.Playing) return;
+        // Jogador local solicita uso de carta ao master
+        photonView.RPC(nameof(RPC_RequestUseCard), RpcTarget.MasterClient, slot);
+    }
+
+    [PunRPC]
+    private void RPC_RequestUseCard(int slot, PhotonMessageInfo info)
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+        if (currentPlayerIndex < 0) return;
+
+        // Apenas o jogador da vez pode usar carta agora
+        if (!actorToPlayerIndex.TryGetValue(info.Sender.ActorNumber, out int senderIdx)) return;
+        if (senderIdx != currentPlayerIndex) return;
+
         HPPlayer player = players[currentPlayerIndex];
-        if (!player.IsLocal) return;
         HPCardType card = slot == 0 ? player.HeldCard : player.HeldCard2;
         if (card == HPCardType.None) return;
-        UseCard(player, card, slot == 0);
-    }
 
-    private void UseCard(HPPlayer player, HPCardType cardType, bool isFirstSlot)
-    {
-        switch (cardType)
-        {
-            case HPCardType.NP3:      UseNP3(player, isFirstSlot);                   break;
-            case HPCardType.Atestado: BeginAtestadoSelection(player, isFirstSlot);   break;
-            case HPCardType.Monster:  UseMonster(player, isFirstSlot);               break;
-            case HPCardType.GPT:      UseGPT(player, isFirstSlot);                   break;
-        }
-        UpdateCardButtons();
-    }
-
-    private void UseNP3(HPPlayer player, bool isFirstSlot)
-    {
-        if (player == null || player.Lives >= 3 || player.Lives <= 1) return;
-        cardView?.PlayUseAnimation(HPCardType.NP3);
-        PlaySfx(salivaClip);
-        player.Lives = Mathf.Min(3, player.Lives + 1);
-        ConsumeCard(player, isFirstSlot);
-    }
-
-    private void UseMonster(HPPlayer player, bool isFirstSlot)
-    {
-        if (timerSystem == null || !timerSystem.Running || timerSystem.Remaining <= 0f) return;
-        cardView?.PlayUseAnimation(HPCardType.Monster);
-        PlaySfx(monsterClip);
-        musicSystem?.SetSpeed(0.75f);
-        timerSystem.SetRemainingTime(timerSystem.Remaining * 2f);
-        ConsumeCard(player, isFirstSlot);
-    }
-
-    private void UseGPT(HPPlayer player, bool isFirstSlot)
-    {
-        cardView?.PlayUseAnimation(HPCardType.GPT);
-        PlaySfx(gepetoClip);
-        ConsumeCard(player, isFirstSlot);
-        // Exibe o valor correto da expressão atual (não o texto "GPT")
-        UpdateLastAnswer(player.Name, HPQuestionSystem.FormatAnswer(currentAnswerValue));
-        questionView?.SetInteractable(false);
-        PassTurnSoon(0.35f);
-    }
-
-    private void BeginAtestadoSelection(HPPlayer player, bool isFirstSlot)
-    {
-        if (AliveCount() <= 1 || !player.IsLocal) return;
-        selectingAtestadoTarget = true;
-        StopBotRoutine();
-        questionView?.SetInteractable(false);
-        cardView?.PlayUseAnimation(HPCardType.Atestado);
-        PlaySfx(tosseClip);
-        SetTargetSelection(true);
+        // Broadcast efeito da carta para todos
+        photonView.RPC(nameof(RPC_ApplyCardEffect), RpcTarget.All,
+                       currentPlayerIndex, (int)card, slot);
     }
 
     private void ConsumeCard(HPPlayer player, bool isFirstSlot)
@@ -691,15 +598,9 @@ public class HPGameManager : MonoBehaviour
         if (seatIndex < 0 || seatIndex >= players.Count) return;
         if (seatIndex == currentPlayerIndex || !players[seatIndex].Alive) return;
 
-        HPPlayer player = players[currentPlayerIndex];
         selectingAtestadoTarget = false;
         SetTargetSelection(false);
-        ConsumeCard(player, true);
-        forcedNextPlayerIndex = seatIndex;
-        resolvingTurn = true;
-        timerSystem?.StopTimer();
-        UpdateCardButtons();
-        StartCoroutine(PassTurnRoutine(0.35f));
+        photonView.RPC(nameof(RPC_ForceNextPlayer), RpcTarget.All, seatIndex, 0.35f);
     }
 
     private void SetTargetSelection(bool enabled)
@@ -732,44 +633,27 @@ public class HPGameManager : MonoBehaviour
     private void ResolveTimeout()
     {
         if (resolvingTurn || currentPlayerIndex < 0) return;
+        if (!PhotonNetwork.IsMasterClient) return;
         resolvingTurn = true;
-        selectingAtestadoTarget = false;
-        SetTargetSelection(false);
-        UpdateCardButtons();
-        StopBotRoutine();
-        StartCoroutine(TimeoutRoutine());
+        photonView.RPC(nameof(RPC_ApplyLifeLoss), RpcTarget.All, currentPlayerIndex);
+        StartCoroutine(AfterTimeoutRoutine());
     }
 
-    private IEnumerator TimeoutRoutine()
+    private IEnumerator AfterTimeoutRoutine()
     {
-        HPPlayer player = players[currentPlayerIndex];
-        timerSystem?.StopTimer();
-        if (player.View != null) player.View.SetLamp(Color.clear, false);
-        questionView?.SetInteractable(false);
-
-        consecutiveWrong    = 0;
-        resetExpressionNext = true;
-        PlaySfx(vidroClip);               // som de vidro ao perder vida por timeout
-        ApplyLifeLoss(player);
-        RefreshAllSeats(false);           // atualiza sprite de vida imediatamente
-
         yield return new WaitForSeconds(1.15f);
-
-        if (AliveCount() <= 1) EndGame();
-        else StartNextTurn();
+        if (AliveCount() <= 1)
+            EndGame();
+        else
+            StartNextTurn();
     }
 
     // ── Passagem de turno ─────────────────────────────────────────────────────
 
     private void PassTurnSoon(float delay)
     {
-        if (resolvingTurn) return;
-        resolvingTurn = true;
-        selectingAtestadoTarget = false;
-        SetTargetSelection(false);
-        UpdateCardButtons();
-        StopBotRoutine();
-        StartCoroutine(PassTurnRoutine(delay));
+        if (!PhotonNetwork.IsMasterClient) return;
+        photonView.RPC(nameof(RPC_PassTurn), RpcTarget.All, delay);
     }
 
     private IEnumerator PassTurnRoutine(float delay)
@@ -784,6 +668,16 @@ public class HPGameManager : MonoBehaviour
 
     private void EndGame()
     {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            HPPlayer winner = GetWinner();
+            int winnerIdx   = winner != null ? players.IndexOf(winner) : -1;
+            photonView.RPC(nameof(RPC_EndGame), RpcTarget.All, winnerIdx);
+        }
+    }
+
+    private void ApplyEndGame(int winnerIndex)
+    {
         phase = HPPhase.GameOver;
         StopAllGameCoroutines();
         selectingAtestadoTarget = false;
@@ -797,12 +691,18 @@ public class HPGameManager : MonoBehaviour
         if (useCardButton1 != null) useCardButton1.gameObject.SetActive(false);
         if (useCardButton2 != null) useCardButton2.gameObject.SetActive(false);
 
-        HPPlayer winner     = GetWinner();
-        string   winnerName = winner != null ? winner.Name : "Ninguém";
+        string winnerName = (winnerIndex >= 0 && winnerIndex < players.Count)
+            ? players[winnerIndex].Name : "Ninguém";
         resultView?.Show(winnerName);
     }
 
     public void ResetToLobby()
+    {
+        if (PhotonNetwork.IsMasterClient)
+            photonView.RPC(nameof(RPC_ResetToLobby), RpcTarget.All);
+    }
+
+    private void ApplyResetToLobby()
     {
         StopAllGameCoroutines();
         phase                   = HPPhase.Lobby;
@@ -825,8 +725,8 @@ public class HPGameManager : MonoBehaviour
         currentTimerMax         = timerMax;
         lobbyWaitTimer          = 0f;
         totalGameTime           = 0f;
-        botNameCounter          = 1;
         players.Clear();
+        actorToPlayerIndex.Clear();
 
         if (suddenDeathText != null) suddenDeathText.gameObject.SetActive(false);
         if (lastAnswerText  != null) lastAnswerText.text = "";
@@ -840,7 +740,8 @@ public class HPGameManager : MonoBehaviour
         vignetteController?.ResetVignette();
         sceneBridge?.ResetAll();
 
-        if (autoAddLocalPlayer) AddLocalPlayer();
+        for (int i = 0; i < 8; i++)
+            sceneBridge?.SetPlayerEliminated(i, false);
 
         RefreshLobbyView();
         RefreshAllSeats(true);
@@ -952,39 +853,303 @@ public class HPGameManager : MonoBehaviour
 
     // ── Bot ───────────────────────────────────────────────────────────────────
 
-    private void ScheduleBotAnswer(float extraDelay, int turnId)
+    private void StopBotRoutine() { /* removido — sem bots */ }
+
+    // ── RPCs Photon ───────────────────────────────────────────────────────────
+
+    [PunRPC]
+    private void RPC_SyncLobbyUI(int seated, int max, int remaining, bool canStart)
     {
-        StopBotRoutine();
-        botRoutine = StartCoroutine(BotRoutine(extraDelay, turnId));
+        if (canStart)
+            lobbyView?.ShowLobby(seated, max, remaining, seated < max);
+        else
+            lobbyView?.ShowLobby(seated, max, 0, false);
     }
 
-    private IEnumerator BotRoutine(float extraDelay, int turnId)
+    [PunRPC]
+    private void RPC_SyncLobbyCountdown(int seconds)
     {
-        float delay = Random.Range(botAnswerDelayMin, botAnswerDelayMax) + Mathf.Max(0f, extraDelay);
-
-        // Nunca ultrapassa 60% do tempo restante para evitar timeout.
-        if (timerSystem != null && timerSystem.Running)
-            delay = Mathf.Min(delay, timerSystem.Remaining * 0.6f);
-
-        // Floor elevado para garantir que resolvingTurn = false (liberado em 0.275 s)
-        // já ocorreu antes de SubmitAnswer ser chamado, inclusive em morte súbita.
-        delay = Mathf.Max(0.45f, delay);
-
-        yield return new WaitForSeconds(delay);
-
-        // Descarta a coroutine se o turno já avançou (guard principal contra múltiplas respostas).
-        if (phase != HPPhase.Playing || currentPlayerIndex < 0) yield break;
-        if (players[currentPlayerIndex].IsLocal) yield break;
-        if (turnId != currentTurnId) yield break;
-
-        // Não grava no input — o usuário não deve ver a resposta do bot.
-        botRoutine = null;
-        SubmitAnswer(HPQuestionSystem.FormatAnswer(currentAnswerValue));
+        lobbyView?.ShowCountdown(seconds);
     }
 
-    private void StopBotRoutine()
+    [PunRPC]
+    private void RPC_StartCountdown()
     {
-        if (botRoutine != null) { StopCoroutine(botRoutine); botRoutine = null; }
+        if (phase != HPPhase.Lobby) return;
+        phase = HPPhase.LobbyCountdown;
+        StartCoroutine(CountdownRoutine());
+    }
+
+    [PunRPC]
+    private void RPC_BeginGame()
+    {
+        BeginGame();
+    }
+
+    [PunRPC]
+    private void RPC_BeginTurn(int playerIndex, string questionText,
+                                string answerStr, string exprText, bool exprHasValue)
+    {
+        currentPlayerIndex  = playerIndex;
+        currentQuestionText = questionText;
+        double.TryParse(answerStr, NumberStyles.Any,
+                        CultureInfo.InvariantCulture, out currentAnswerValue);
+        currentExpression = new HPQuestionSystem.ExpressionState
+        {
+            Text     = exprText,
+            Value    = currentAnswerValue,
+            HasValue = exprHasValue
+        };
+
+        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        HPPlayer player = players[playerIndex];
+
+        sceneBridge?.SetActivePlayer(playerIndex);
+        sceneBridge?.SetArrowTarget(playerIndex);
+        sceneBridge?.SetDerraunde(playerIndex);
+        RefreshActivePlayerView();
+
+        if (player.IsLocal)
+            questionView?.Show(player.Name, questionText, true);
+        else
+            questionView?.ShowForBot(questionText);
+
+        timerSystem?.StartTimer(currentTimerMax);
+        resolvingTurn = false;
+        UpdateCardButtons();
+    }
+
+    [PunRPC]
+    private void RPC_OnAnswerCorrect(int playerIndex, string answer, bool earnedCard)
+    {
+        if (playerIndex >= 0 && playerIndex < players.Count)
+            UpdateLastAnswer(players[playerIndex].Name, answer);
+        questionView?.SetInteractable(false);
+        PlaySfx(null); // som de acerto opcional
+    }
+
+    [PunRPC]
+    private void RPC_OnAnswerWrong(int playerIndex, float penalty)
+    {
+        PlaySfx(vidroClip);
+        timerSystem?.Penalize(penalty);
+        if (playerIndex >= 0 && playerIndex < players.Count
+            && players[playerIndex].IsLocal)
+            questionView?.SetInteractable(true);
+    }
+
+    [PunRPC]
+    private void RPC_ShowOperationChoice(int playerIndex, string[] ops, bool earnedCard)
+    {
+        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        HPPlayer player = players[playerIndex];
+
+        if (player.IsLocal)
+        {
+            // Só o jogador da vez vê o painel de operação
+            opChoiceView?.Show(ops, opChoiceTimeout, op =>
+            {
+                photonView.RPC(nameof(RPC_RequestOperation), RpcTarget.MasterClient,
+                               op, earnedCard);
+            });
+        }
+    }
+
+    [PunRPC]
+    private void RPC_RequestOperation(string op, bool earnedCard, PhotonMessageInfo info)
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+        if (questionSystem == null) return;
+
+        currentExpression   = questionSystem.ApplyChosenOperation(currentExpression, op);
+        currentQuestionText = "Quanto é: " + currentExpression.Text + " = ?";
+        currentAnswerValue  = currentExpression.Value;
+
+        photonView.RPC(nameof(RPC_ApplyOperation), RpcTarget.All,
+                       currentQuestionText, currentExpression.Text,
+                       HPQuestionSystem.FormatAnswer(currentAnswerValue));
+
+        if (earnedCard)
+        {
+            HPPlayer player = players[currentPlayerIndex];
+            MasterGiveCard(player, currentPlayerIndex);
+        }
+        photonView.RPC(nameof(RPC_PassTurn), RpcTarget.All, 0.35f);
+    }
+
+    [PunRPC]
+    private void RPC_ApplyOperation(string questionText, string exprText, string answerStr)
+    {
+        currentQuestionText = questionText;
+        currentExpression.Text = exprText;
+        double.TryParse(answerStr, NumberStyles.Any,
+                        CultureInfo.InvariantCulture, out currentAnswerValue);
+        currentExpression.Value    = currentAnswerValue;
+        currentExpression.HasValue = true;
+        questionView?.UpdateQuestion(questionText);
+        opChoiceView?.Hide();
+    }
+
+    [PunRPC]
+    private void RPC_GiveCard(int playerIndex, int slot, int cardType)
+    {
+        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        HPPlayer player = players[playerIndex];
+        HPCardType type = (HPCardType)cardType;
+
+        if (slot == 0) player.HeldCard  = type;
+        else           player.HeldCard2 = type;
+
+        player.View?.SetPlayer(player, playerIndex + 1);
+        cardView?.ShowFloatingCard(player.Name);
+        UpdateCardButtons();
+    }
+
+    [PunRPC]
+    private void RPC_ApplyCardEffect(int playerIndex, int cardTypeInt, int slot)
+    {
+        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        HPPlayer   player   = players[playerIndex];
+        HPCardType cardType = (HPCardType)cardTypeInt;
+        bool       isFirst  = slot == 0;
+
+        switch (cardType)
+        {
+            case HPCardType.NP3:
+                cardView?.PlayUseAnimation(HPCardType.NP3);
+                PlaySfx(salivaClip);
+                player.Lives = Mathf.Min(3, player.Lives + 1);
+                ConsumeCard(player, isFirst);
+                break;
+
+            case HPCardType.Monster:
+                cardView?.PlayUseAnimation(HPCardType.Monster);
+                PlaySfx(monsterClip);
+                musicSystem?.SetSpeed(0.75f);
+                timerSystem?.SetRemainingTime(
+                    timerSystem != null ? timerSystem.Remaining * 2f : timerMax);
+                ConsumeCard(player, isFirst);
+                break;
+
+            case HPCardType.GPT:
+                cardView?.PlayUseAnimation(HPCardType.GPT);
+                PlaySfx(gepetoClip);
+                ConsumeCard(player, isFirst);
+                UpdateLastAnswer(player.Name, HPQuestionSystem.FormatAnswer(currentAnswerValue));
+                questionView?.SetInteractable(false);
+                if (PhotonNetwork.IsMasterClient)
+                    photonView.RPC(nameof(RPC_PassTurn), RpcTarget.All, 0.35f);
+                break;
+
+            case HPCardType.Atestado:
+                cardView?.PlayUseAnimation(HPCardType.Atestado);
+                PlaySfx(tosseClip);
+                if (player.IsLocal)
+                {
+                    selectingAtestadoTarget = true;
+                    SetTargetSelection(true);
+                }
+                ConsumeCard(player, isFirst);
+                break;
+        }
+        UpdateCardButtons();
+    }
+
+    [PunRPC]
+    private void RPC_ApplyLifeLoss(int playerIndex)
+    {
+        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        HPPlayer player = players[playerIndex];
+        player.Lives = Mathf.Max(0, player.Lives - 1);
+        if (player.Lives <= 0)
+        {
+            player.Eliminated = true;
+            sceneBridge?.SetPlayerEliminated(playerIndex, true);
+        }
+        PlaySfx(vidroClip);
+        RefreshAllSeats(false);
+        if (shakeRoutine != null) StopCoroutine(shakeRoutine);
+        shakeRoutine = StartCoroutine(ShakeRoutine());
+    }
+
+    [PunRPC]
+    private void RPC_PassTurn(float delay)
+    {
+        resolvingTurn = true;
+        selectingAtestadoTarget = false;
+        SetTargetSelection(false);
+        UpdateCardButtons();
+        if (passRoutine != null) StopCoroutine(passRoutine);
+        passRoutine = StartCoroutine(PassTurnRoutine(delay));
+    }
+
+    [PunRPC]
+    private void RPC_ForceNextPlayer(int playerIndex, float delay)
+    {
+        forcedNextPlayerIndex = playerIndex;
+        resolvingTurn = true;
+        selectingAtestadoTarget = false;
+        SetTargetSelection(false);
+        UpdateCardButtons();
+        if (passRoutine != null) StopCoroutine(passRoutine);
+        passRoutine = StartCoroutine(PassTurnRoutine(delay));
+    }
+
+    [PunRPC]
+    private void RPC_EndGame(int winnerIndex)
+    {
+        ApplyEndGame(winnerIndex);
+    }
+
+    [PunRPC]
+    private void RPC_ResetToLobby()
+    {
+        ApplyResetToLobby();
+    }
+
+    // ── Helper master — dá carta a um jogador e faz broadcast ─────────────────
+
+    private void MasterGiveCard(HPPlayer player, int playerIndex)
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+        HPCardType optA = RandomCard();
+        HPCardType optB = RandomCardDifferentFrom(optA);
+
+        int slot = player.HeldCard == HPCardType.None ? 0 : 1;
+
+        if (!player.IsLocal)
+        {
+            // Bot/jogador remoto: escolha aleatória imediata
+            HPCardType picked = Random.value < 0.5f ? optA : optB;
+            photonView.RPC(nameof(RPC_GiveCard), RpcTarget.All,
+                           playerIndex, slot, (int)picked);
+            return;
+        }
+
+        // Para o jogador local: mostra painel de escolha via RPC para ele
+        photonView.RPC(nameof(RPC_ShowCardChoice), RpcTarget.All,
+                       playerIndex, (int)optA, (int)optB, slot);
+    }
+
+    [PunRPC]
+    private void RPC_ShowCardChoice(int playerIndex, int cardA, int cardB, int slot)
+    {
+        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        HPPlayer player = players[playerIndex];
+        if (!player.IsLocal) return;
+
+        cardChoicePlayer = player;
+        cardView?.ShowChoice(player.Name, (HPCardType)cardA, (HPCardType)cardB, chosen =>
+        {
+            photonView.RPC(nameof(RPC_GiveCard), RpcTarget.MasterClient,
+                           playerIndex, slot, (int)chosen);
+            photonView.RPC(nameof(RPC_GiveCard), RpcTarget.All,
+                           playerIndex, slot, (int)chosen);
+            cardView?.HideChoice();
+        });
+
+        if (cardChoiceAutoRoutine != null) StopCoroutine(cardChoiceAutoRoutine);
+        cardChoiceAutoRoutine = StartCoroutine(CardChoiceTimeoutNoCard(cardChoiceTimeout));
     }
 
     // ── Animação de shake ─────────────────────────────────────────────────────
@@ -1051,9 +1216,9 @@ public class HPGameManager : MonoBehaviour
 
     private void StopAllGameCoroutines()
     {
-        StopBotRoutine();
         if (cardChoiceAutoRoutine != null) { StopCoroutine(cardChoiceAutoRoutine); cardChoiceAutoRoutine = null; }
         if (turnRoutine           != null) { StopCoroutine(turnRoutine);           turnRoutine = null; }
         if (shakeRoutine          != null) { StopCoroutine(shakeRoutine);          shakeRoutine = null; }
+        if (passRoutine           != null) { StopCoroutine(passRoutine);           passRoutine = null; }
     }
 }
