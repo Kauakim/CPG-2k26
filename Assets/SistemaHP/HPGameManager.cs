@@ -427,12 +427,38 @@ public class HPGameManager : MonoBehaviourPun
         }
         var result = questionSystem.PrepareQuestion(
             turnCount, currentExpression, consecutiveWrong, resetExpressionNext);
-        currentQuestionText  = result.questionText;
+        currentQuestionText  = WrapTextAt30Chars(result.questionText);
         currentAnswerValue   = result.answerValue;
         currentExpression    = result.newExpression;
         resetExpressionNext  = false;
         lastAnswerCorrect    = false;
         hasPreviousAnswer    = false;
+    }
+
+    /// <summary>
+    /// Quebra texto em múltiplas linhas com máximo de 30 caracteres por linha.
+    /// Respeita espaços e palavras completas.
+    /// </summary>
+    private static string WrapTextAt30Chars(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        const int maxCharsPerLine = 30;
+        var lines = new System.Collections.Generic.List<string>();
+        var currentLine = new System.Text.StringBuilder();
+        var words = text.Split(' ');
+
+        foreach (var word in words)
+        {
+            if (currentLine.Length + word.Length + (currentLine.Length > 0 ? 1 : 0) > maxCharsPerLine && currentLine.Length > 0)
+            {
+                lines.Add(currentLine.ToString());
+                currentLine.Clear();
+            }
+            if (currentLine.Length > 0) currentLine.Append(' ');
+            currentLine.Append(word);
+        }
+        if (currentLine.Length > 0) lines.Add(currentLine.ToString());
+        return string.Join("\n", lines);
     }
 
     // ── Submissão de resposta ─────────────────────────────────────────────────
@@ -891,7 +917,7 @@ public class HPGameManager : MonoBehaviourPun
                                 string answerStr, string exprText, bool exprHasValue)
     {
         currentPlayerIndex  = playerIndex;
-        currentQuestionText = questionText;
+        currentQuestionText = WrapTextAt30Chars(questionText);
         double.TryParse(answerStr, NumberStyles.Any,
                         CultureInfo.InvariantCulture, out currentAnswerValue);
         currentExpression = new HPQuestionSystem.ExpressionState
@@ -962,7 +988,7 @@ public class HPGameManager : MonoBehaviourPun
         if (questionSystem == null) return;
 
         currentExpression   = questionSystem.ApplyChosenOperation(currentExpression, op);
-        currentQuestionText = "Quanto é: " + currentExpression.Text + " = ?";
+        currentQuestionText = currentExpression.Text;
         currentAnswerValue  = currentExpression.Value;
 
         photonView.RPC(nameof(RPC_ApplyOperation), RpcTarget.All,
@@ -1013,18 +1039,18 @@ public class HPGameManager : MonoBehaviourPun
         HPCardType cardType = (HPCardType)cardTypeInt;
         bool       isFirst  = slot == 0;
 
+        // Animação e som tocam para TODOS via RPC
+        cardView?.PlayUseAnimation(cardType);
+        PlaySfxForCardType(cardType);
+
         switch (cardType)
         {
             case HPCardType.NP3:
-                cardView?.PlayUseAnimation(HPCardType.NP3);
-                PlaySfx(salivaClip);
                 player.Lives = Mathf.Min(3, player.Lives + 1);
                 ConsumeCard(player, isFirst);
                 break;
 
             case HPCardType.Monster:
-                cardView?.PlayUseAnimation(HPCardType.Monster);
-                PlaySfx(monsterClip);
                 musicSystem?.SetSpeed(0.75f);
                 timerSystem?.SetRemainingTime(
                     timerSystem != null ? timerSystem.Remaining * 2f : timerMax);
@@ -1032,8 +1058,6 @@ public class HPGameManager : MonoBehaviourPun
                 break;
 
             case HPCardType.GPT:
-                cardView?.PlayUseAnimation(HPCardType.GPT);
-                PlaySfx(gepetoClip);
                 ConsumeCard(player, isFirst);
                 UpdateLastAnswer(player.Name, HPQuestionSystem.FormatAnswer(currentAnswerValue));
                 questionView?.SetInteractable(false);
@@ -1042,8 +1066,6 @@ public class HPGameManager : MonoBehaviourPun
                 break;
 
             case HPCardType.Atestado:
-                cardView?.PlayUseAnimation(HPCardType.Atestado);
-                PlaySfx(tosseClip);
                 if (player.IsLocal)
                 {
                     selectingAtestadoTarget = true;
@@ -1053,6 +1075,28 @@ public class HPGameManager : MonoBehaviourPun
                 break;
         }
         UpdateCardButtons();
+    }
+
+    /// <summary>
+    /// Toca som apropriado para o tipo de carta.
+    /// </summary>
+    private void PlaySfxForCardType(HPCardType cardType)
+    {
+        switch (cardType)
+        {
+            case HPCardType.NP3:
+                PlaySfx(salivaClip);
+                break;
+            case HPCardType.Monster:
+                PlaySfx(monsterClip);
+                break;
+            case HPCardType.GPT:
+                PlaySfx(gepetoClip);
+                break;
+            case HPCardType.Atestado:
+                PlaySfx(tosseClip);
+                break;
+        }
     }
 
     [PunRPC]

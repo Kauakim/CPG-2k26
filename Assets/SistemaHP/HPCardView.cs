@@ -17,6 +17,10 @@ public class HPCardView : MonoBehaviour
     [SerializeField] private Image option1Background;
     [SerializeField] private Image option2Background;
 
+    [Header("Labels de nome das cartas")]
+    [SerializeField] private Text option1Label;
+    [SerializeField] private Text option2Label;
+
     [Header("Sprites de background — um por tipo de carta")]
     [SerializeField] private Sprite bgNP3;
     [SerializeField] private Sprite bgAtestado;
@@ -67,8 +71,8 @@ public class HPCardView : MonoBehaviour
         if (choiceTitleText != null)
             choiceTitleText.text = playerName + " ganhou uma carta!";
 
-        SetupOption(option1Button, option1Background, first);
-        SetupOption(option2Button, option2Background, second);
+        SetupOption(option1Button, option1Background, option1Label, first);
+        SetupOption(option2Button, option2Background, option2Label, second);
     }
 
     public void HideChoice()
@@ -77,11 +81,12 @@ public class HPCardView : MonoBehaviour
         if (choicePanel != null) choicePanel.SetActive(false);
     }
 
-    private void SetupOption(Button btn, Image background, HPCardType cardType)
+    private void SetupOption(Button btn, Image background, Text label, HPCardType cardType)
     {
         if (btn == null) return;
 
         if (background != null) background.sprite = GetBackgroundSprite(cardType);
+        if (label != null) label.text = HPCardInfo.DisplayName(cardType);
 
         HPCardType captured = cardType;
         btn.onClick.RemoveAllListeners();

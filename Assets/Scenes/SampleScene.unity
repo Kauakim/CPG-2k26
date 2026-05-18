@@ -8016,7 +8016,9 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8005053662360981671, guid: f494d112634482c4697e9b16e5318d27, type: 3}
       propertyPath: m_Text
-      value: Ynoguti Senpai
+      value: 'Ynoguti Senpai
+
+'
       objectReference: {fileID: 0}
     - target: {fileID: 8005053662360981671, guid: f494d112634482c4697e9b16e5318d27, type: 3}
       propertyPath: m_FontData.m_Font
@@ -10431,6 +10433,10 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 5
       objectReference: {fileID: 0}
+    - target: {fileID: 778227647091158916, guid: 49c0845aae6f81c42a8e0329676f21a4, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 976717309226316816, guid: 49c0845aae6f81c42a8e0329676f21a4, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.54
@@ -10774,6 +10780,14 @@ PrefabInstance:
     - target: {fileID: 3608256858123846328, guid: 49c0845aae6f81c42a8e0329676f21a4, type: 3}
       propertyPath: m_SizeDelta.y
       value: 429.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 3608256858123846328, guid: 49c0845aae6f81c42a8e0329676f21a4, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: -269
+      objectReference: {fileID: 0}
+    - target: {fileID: 3608256858123846328, guid: 49c0845aae6f81c42a8e0329676f21a4, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -89
       objectReference: {fileID: 0}
     - target: {fileID: 3777631526782258991, guid: 49c0845aae6f81c42a8e0329676f21a4, type: 3}
       propertyPath: m_Colors.m_HighlightedColor.b
@@ -14282,7 +14296,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxPlayers: 8
-  minPlayers: 3
+  minPlayers: 1
   timerMax: 30
   timerPenalty: 8
   cardEarnThreshold: 5
@@ -16698,7 +16712,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 885dcf034d118294fb26ef063d8611d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  roomCode: PRCY
+  roomCode: 6LTS
 --- !u!114 &2137863483
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16706,7 +16720,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2137863477}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 932a081d9a46d9b4ebf7d10928934a80, type: 3}
   m_Name: 
@@ -16730,7 +16744,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2137863477}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3b2d5e23d01154246837ab3c6dc4707e, type: 3}
   m_Name: 
@@ -16748,7 +16762,7 @@ MonoBehaviour:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  gameManager: {fileID: 1660480917}
+  gameManager: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

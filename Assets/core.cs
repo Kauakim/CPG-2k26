@@ -2034,7 +2034,7 @@ public class core : MonoBehaviour
         GameObject arrowObject = scene.CreateUIObject("Arrow", table);
         arrowPivot = arrowObject.GetComponent<RectTransform>();
         arrowPivot.sizeDelta = arrowSize;
-        arrowPivot.anchoredPosition = new Vector2(-15f, 10f);
+        arrowPivot.anchoredPosition = new Vector2(0f, 0f);
 
         Image arrowImage = arrowObject.AddComponent<Image>();
         if (arrowSprite != null)
@@ -2055,7 +2055,7 @@ public class core : MonoBehaviour
         GameObject derraUndeObject = scene.CreateUIObject("DerraUnde", table);
         derraUndePivot = derraUndeObject.GetComponent<RectTransform>();
         derraUndePivot.sizeDelta = derraUndeSize;
-        derraUndePivot.anchoredPosition = new Vector2(-460f, -280f);
+        derraUndePivot.anchoredPosition = new Vector2(0f, -150f);
         derraUndeImage = derraUndeObject.AddComponent<Image>();
         derraUndeImage.preserveAspect = true;
         if (derraUndeSprite != null)
