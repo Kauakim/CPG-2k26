@@ -299,7 +299,7 @@ GameObject:
   m_Component:
   - component: {fileID: 96020076}
   m_Layer: 0
-  m_Name: Quadros
+  m_Name: Boards
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -335,7 +335,7 @@ GameObject:
   - component: {fileID: 96145823}
   - component: {fileID: 96145824}
   m_Layer: 0
-  m_Name: Mesa
+  m_Name: Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -356,6 +356,7 @@ Transform:
   m_Children:
   - {fileID: 1900677555}
   - {fileID: 180417345}
+  - {fileID: 652343438}
   m_Father: {fileID: 141342875}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &96145824
@@ -456,7 +457,7 @@ GameObject:
   m_Component:
   - component: {fileID: 141342875}
   m_Layer: 0
-  m_Name: 'Mesa Zona 4 '
+  m_Name: Desk4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -476,7 +477,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 96145823}
-  - {fileID: 652343438}
   - {fileID: 948300285}
   m_Father: {fileID: 167391769}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -491,7 +491,7 @@ GameObject:
   - component: {fileID: 165717364}
   - component: {fileID: 165717365}
   m_Layer: 0
-  m_Name: F2
+  m_Name: W2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -596,7 +596,6 @@ Transform:
   - {fileID: 2065556682}
   - {fileID: 941015058}
   - {fileID: 2115500169}
-  - {fileID: 1155293100}
   - {fileID: 141342875}
   - {fileID: 281370704}
   - {fileID: 824772713}
@@ -626,7 +625,7 @@ GameObject:
   - component: {fileID: 180417345}
   - component: {fileID: 180417346}
   m_Layer: 0
-  m_Name: Notebook 2
+  m_Name: Laptop2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -722,7 +721,7 @@ GameObject:
   - component: {fileID: 200926095}
   - component: {fileID: 200926096}
   m_Layer: 0
-  m_Name: Personagem 7
+  m_Name: Character6
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -806,7 +805,7 @@ GameObject:
   m_Component:
   - component: {fileID: 217396866}
   m_Layer: 0
-  m_Name: LUZES
+  m_Name: Lights
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -842,7 +841,7 @@ GameObject:
   - component: {fileID: 226426343}
   - component: {fileID: 226426344}
   m_Layer: 0
-  m_Name: Notebook 2
+  m_Name: Laptop2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -857,12 +856,12 @@ Transform:
   m_GameObject: {fileID: 226426342}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 6.0111895, y: -2.81, z: -0.35230017}
-  m_LocalScale: {x: 2.5432, y: 2.5432, z: 2.5432}
+  m_LocalPosition: {x: 0.2426261, y: 0.24567473, z: -0.07000022}
+  m_LocalScale: {x: 0.87999994, y: 0.87999994, z: 0.87999994}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 698420453}
-  m_Father: {fileID: 281370704}
+  m_Father: {fileID: 1781408034}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &226426344
 SpriteRenderer:
@@ -948,7 +947,7 @@ GameObject:
   m_Component:
   - component: {fileID: 270183227}
   m_Layer: 0
-  m_Name: CENTRO
+  m_Name: Main
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -988,7 +987,7 @@ GameObject:
   m_Component:
   - component: {fileID: 281370704}
   m_Layer: 0
-  m_Name: Mesa Zona 5
+  m_Name: Desk5
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1008,12 +1007,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1781408034}
-  - {fileID: 1271517841}
-  - {fileID: 226426343}
-  - {fileID: 1844705098}
   - {fileID: 373704634}
   - {fileID: 1876256868}
-  - {fileID: 1692695150}
   m_Father: {fileID: 167391769}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &282576138 stripped
@@ -1269,7 +1264,7 @@ GameObject:
   - component: {fileID: 373704634}
   - component: {fileID: 373704635}
   m_Layer: 0
-  m_Name: Cadeira 1
+  m_Name: Char1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1353,7 +1348,7 @@ GameObject:
   - component: {fileID: 385908667}
   - component: {fileID: 385908668}
   m_Layer: 0
-  m_Name: Mesa
+  m_Name: Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1374,6 +1369,9 @@ Transform:
   m_Children:
   - {fileID: 702971485}
   - {fileID: 1157718484}
+  - {fileID: 1356856528}
+  - {fileID: 405705892}
+  - {fileID: 1567167564}
   m_Father: {fileID: 941015058}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &385908668
@@ -1439,7 +1437,7 @@ GameObject:
   - component: {fileID: 405705892}
   - component: {fileID: 405705893}
   m_Layer: 0
-  m_Name: Monster 1
+  m_Name: Monster1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1454,11 +1452,11 @@ Transform:
   m_GameObject: {fileID: 405705891}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -6.129, y: 1.167, z: -0.35230005}
-  m_LocalScale: {x: 1.156, y: 1.156, z: 1.156}
+  m_LocalPosition: {x: -0.4252595, y: -0.021799292, z: -0.07000022}
+  m_LocalScale: {x: 0.39999998, y: 0.39999998, z: 0.39999998}
   m_ConstrainProportionsScale: 1
   m_Children: []
-  m_Father: {fileID: 941015058}
+  m_Father: {fileID: 385908667}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &405705893
 SpriteRenderer:
@@ -1523,7 +1521,7 @@ GameObject:
   - component: {fileID: 417912927}
   - component: {fileID: 417912928}
   m_Layer: 0
-  m_Name: Pizza 2
+  m_Name: Pizza2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1607,7 +1605,7 @@ GameObject:
   - component: {fileID: 423002448}
   - component: {fileID: 423002449}
   m_Layer: 0
-  m_Name: Cadeira 2
+  m_Name: Char2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1773,7 +1771,7 @@ GameObject:
   - component: {fileID: 503736694}
   - component: {fileID: 503736695}
   m_Layer: 0
-  m_Name: F5
+  m_Name: W5
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1859,7 +1857,7 @@ GameObject:
   - component: {fileID: 519420029}
   - component: {fileID: 519420030}
   m_Layer: 0
-  m_Name: Main Camera
+  m_Name: Main_Camera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2225,7 +2223,7 @@ GameObject:
   - component: {fileID: 575465933}
   - component: {fileID: 575465934}
   m_Layer: 0
-  m_Name: Mesa
+  m_Name: Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2245,6 +2243,8 @@ Transform:
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1279630678}
+  - {fileID: 1632912586}
+  - {fileID: 1155293100}
   m_Father: {fileID: 2115500169}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &575465934
@@ -2310,7 +2310,7 @@ GameObject:
   - component: {fileID: 612378876}
   - component: {fileID: 612378877}
   m_Layer: 0
-  m_Name: F1
+  m_Name: W1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2394,7 +2394,7 @@ GameObject:
   - component: {fileID: 619394802}
   - component: {fileID: 619394801}
   m_Layer: 0
-  m_Name: Global Light 2D
+  m_Name: Global_Light
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2476,7 +2476,7 @@ GameObject:
   - component: {fileID: 627696147}
   - component: {fileID: 627696148}
   m_Layer: 0
-  m_Name: Cadeira 1
+  m_Name: Char
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2582,7 +2582,7 @@ GameObject:
   - component: {fileID: 640961918}
   - component: {fileID: 640961919}
   m_Layer: 0
-  m_Name: Personagem 6
+  m_Name: Character5
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2667,7 +2667,7 @@ GameObject:
   - component: {fileID: 652343438}
   - component: {fileID: 652343439}
   m_Layer: 0
-  m_Name: Notebook
+  m_Name: Laptop3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2682,12 +2682,12 @@ Transform:
   m_GameObject: {fileID: 652343437}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -5.93, y: -3.47, z: -0.46790123}
-  m_LocalScale: {x: 2.1964, y: 2.1964, z: 2.1964002}
+  m_LocalPosition: {x: -0.28719717, y: 0.05190306, z: -0.110000744}
+  m_LocalScale: {x: 0.75999993, y: 0.75999993, z: 0.76}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1029566767}
-  m_Father: {fileID: 141342875}
+  m_Father: {fileID: 96145823}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &652343439
 SpriteRenderer:
@@ -2890,7 +2890,7 @@ MonoBehaviour:
   m_ShadowVolumeIntensity: 0.75
   m_LocalBounds:
     m_Center: {x: 0, y: 0, z: 0}
-    m_Extent: {x: 0.97, y: 1.295, z: 0}
+    m_Extent: {x: 0, y: 0, z: 0}
   m_PointLightInnerAngle: 360
   m_PointLightOuterAngle: 360
   m_PointLightInnerRadius: 0
@@ -3009,7 +3009,7 @@ GameObject:
   - component: {fileID: 702971485}
   - component: {fileID: 702971486}
   m_Layer: 0
-  m_Name: Pizza 1
+  m_Name: Pizza1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3175,7 +3175,7 @@ GameObject:
   - component: {fileID: 760042976}
   - component: {fileID: 760042977}
   m_Layer: 0
-  m_Name: Personagem 8
+  m_Name: Character7
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3260,7 +3260,7 @@ GameObject:
   - component: {fileID: 760970640}
   - component: {fileID: 760970639}
   m_Layer: 0
-  m_Name: "CEN\xC1RIO"
+  m_Name: Scenery
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -3309,7 +3309,7 @@ GameObject:
   - component: {fileID: 788965558}
   - component: {fileID: 788965557}
   m_Layer: 0
-  m_Name: Floor Tilemap
+  m_Name: Floor_Tilemap
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7355,7 +7355,7 @@ GameObject:
   m_Component:
   - component: {fileID: 824772713}
   m_Layer: 0
-  m_Name: Mesa Zona 6
+  m_Name: Desk6
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7479,7 +7479,7 @@ GameObject:
   - component: {fileID: 880761307}
   - component: {fileID: 880761308}
   m_Layer: 0
-  m_Name: Personagem 3
+  m_Name: Character2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7575,7 +7575,7 @@ GameObject:
   - component: {fileID: 888349296}
   - component: {fileID: 888349297}
   m_Layer: 0
-  m_Name: Personagem 2
+  m_Name: Character1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7693,7 +7693,7 @@ GameObject:
   - component: {fileID: 920032689}
   - component: {fileID: 920032690}
   m_Layer: 0
-  m_Name: Atual Personagem
+  m_Name: Current_Character
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -7776,7 +7776,7 @@ GameObject:
   - component: {fileID: 928465544}
   - component: {fileID: 928465545}
   m_Layer: 0
-  m_Name: Global Volume
+  m_Name: Global_Volume
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8053,7 +8053,7 @@ GameObject:
   m_Component:
   - component: {fileID: 941015058}
   m_Layer: 0
-  m_Name: Mesa Zona 2
+  m_Name: Desk2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8073,9 +8073,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 385908667}
-  - {fileID: 1356856528}
-  - {fileID: 405705892}
-  - {fileID: 1567167564}
   - {fileID: 1025939856}
   m_Father: {fileID: 167391769}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -8174,7 +8171,7 @@ GameObject:
   - component: {fileID: 948300285}
   - component: {fileID: 948300286}
   m_Layer: 0
-  m_Name: Cadeira 1
+  m_Name: Char
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8269,7 +8266,7 @@ GameObject:
   - component: {fileID: 960041718}
   - component: {fileID: 960041719}
   m_Layer: 0
-  m_Name: Monster 1
+  m_Name: Monster1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -8533,7 +8530,7 @@ GameObject:
   - component: {fileID: 995096684}
   - component: {fileID: 995096683}
   m_Layer: 0
-  m_Name: Desk Background Tilemap
+  m_Name: Wall_Tilemap
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -9894,7 +9891,7 @@ GameObject:
   - component: {fileID: 1025939856}
   - component: {fileID: 1025939857}
   m_Layer: 0
-  m_Name: Cadeira 1
+  m_Name: Char
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -10082,7 +10079,7 @@ GameObject:
   - component: {fileID: 1067348898}
   - component: {fileID: 1067348899}
   m_Layer: 0
-  m_Name: F6
+  m_Name: W6
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11443,7 +11440,7 @@ GameObject:
   - component: {fileID: 1155293100}
   - component: {fileID: 1155293101}
   m_Layer: 0
-  m_Name: Notebook
+  m_Name: Laptop2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11458,12 +11455,12 @@ Transform:
   m_GameObject: {fileID: 1155293099}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -6.96, y: -0.04, z: -4.4679003}
-  m_LocalScale: {x: 2.1964, y: 2.1964, z: 2.1964002}
+  m_LocalPosition: {x: 0.31141868, y: 0.25605533, z: -0.110000744}
+  m_LocalScale: {x: 0.75999993, y: 0.75999993, z: 0.76}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1702550832}
-  m_Father: {fileID: 167391769}
+  m_Father: {fileID: 575465933}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1155293101
 SpriteRenderer:
@@ -11528,7 +11525,7 @@ GameObject:
   - component: {fileID: 1157718484}
   - component: {fileID: 1157718485}
   m_Layer: 0
-  m_Name: Pizza 2
+  m_Name: Pizza2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11612,7 +11609,7 @@ GameObject:
   - component: {fileID: 1160758541}
   - component: {fileID: 1160758542}
   m_Layer: 0
-  m_Name: F3
+  m_Name: W3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11707,7 +11704,7 @@ GameObject:
   - component: {fileID: 1172382106}
   - component: {fileID: 1172382107}
   m_Layer: 0
-  m_Name: Personagem 1
+  m_Name: Character0
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11867,7 +11864,7 @@ GameObject:
   - component: {fileID: 1187346142}
   - component: {fileID: 1187346143}
   m_Layer: 0
-  m_Name: F4
+  m_Name: W4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12118,7 +12115,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1235140905}
   m_Layer: 0
-  m_Name: Fios
+  m_Name: Wires
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12174,7 +12171,7 @@ GameObject:
   - component: {fileID: 1271517841}
   - component: {fileID: 1271517842}
   m_Layer: 0
-  m_Name: Notebook
+  m_Name: Laptop1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12189,12 +12186,12 @@ Transform:
   m_GameObject: {fileID: 1271517840}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 4.65, y: -2.81, z: -0.35230017}
-  m_LocalScale: {x: 2.5432, y: 2.5432, z: 2.5432}
+  m_LocalPosition: {x: -0.22837363, y: 0.24567473, z: -0.07000022}
+  m_LocalScale: {x: 0.87999994, y: 0.87999994, z: 0.87999994}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 972174169}
-  m_Father: {fileID: 281370704}
+  m_Father: {fileID: 1781408034}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1271517842
 SpriteRenderer:
@@ -12275,7 +12272,7 @@ GameObject:
   - component: {fileID: 1279630678}
   - component: {fileID: 1279630679}
   m_Layer: 0
-  m_Name: Pizza 1
+  m_Name: Pizza
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12359,7 +12356,7 @@ GameObject:
   - component: {fileID: 1281211524}
   - component: {fileID: 1281211525}
   m_Layer: 0
-  m_Name: Mesa Central
+  m_Name: Center_Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12740,7 +12737,7 @@ GameObject:
   - component: {fileID: 1356856528}
   - component: {fileID: 1356856529}
   m_Layer: 0
-  m_Name: Notebook
+  m_Name: Laptop
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12755,12 +12752,12 @@ Transform:
   m_GameObject: {fileID: 1356856527}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -5.31, y: 2.03, z: -0.46790028}
-  m_LocalScale: {x: 2.1964, y: 2.1964, z: 2.1964002}
+  m_LocalPosition: {x: -0.14186844, y: 0.27681658, z: -0.110000744}
+  m_LocalScale: {x: 0.75999993, y: 0.75999993, z: 0.76}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1505557655}
-  m_Father: {fileID: 941015058}
+  m_Father: {fileID: 385908667}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1356856529
 SpriteRenderer:
@@ -12836,7 +12833,7 @@ GameObject:
   - component: {fileID: 1421278412}
   - component: {fileID: 1421278413}
   m_Layer: 0
-  m_Name: Mesa
+  m_Name: Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12964,7 +12961,7 @@ GameObject:
   - component: {fileID: 1469809703}
   - component: {fileID: 1469809704}
   m_Layer: 0
-  m_Name: Mesa
+  m_Name: Desk
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13477,7 +13474,7 @@ GameObject:
   - component: {fileID: 1527229040}
   - component: {fileID: 1527229041}
   m_Layer: 0
-  m_Name: Q2
+  m_Name: B2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13561,7 +13558,7 @@ GameObject:
   - component: {fileID: 1548173706}
   - component: {fileID: 1548173707}
   m_Layer: 0
-  m_Name: Personagem 5
+  m_Name: Character4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13646,7 +13643,7 @@ GameObject:
   - component: {fileID: 1567167564}
   - component: {fileID: 1567167565}
   m_Layer: 0
-  m_Name: Monster 2
+  m_Name: Monster2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -13661,11 +13658,11 @@ Transform:
   m_GameObject: {fileID: 1567167563}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -5.964, y: 1.12, z: -0.35230005}
-  m_LocalScale: {x: 1.156, y: 1.156, z: 1.156}
+  m_LocalPosition: {x: -0.3681661, y: -0.038062286, z: -0.07000022}
+  m_LocalScale: {x: 0.39999998, y: 0.39999998, z: 0.39999998}
   m_ConstrainProportionsScale: 1
   m_Children: []
-  m_Father: {fileID: 941015058}
+  m_Father: {fileID: 385908667}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1567167565
 SpriteRenderer:
@@ -14013,7 +14010,7 @@ GameObject:
   - component: {fileID: 1632912586}
   - component: {fileID: 1632912587}
   m_Layer: 0
-  m_Name: Notebook
+  m_Name: Laptop1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -14028,12 +14025,12 @@ Transform:
   m_GameObject: {fileID: 1632912585}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -8.56, y: -0.1, z: -0.46790075}
-  m_LocalScale: {x: 2.1964, y: 2.1964, z: 2.1964002}
+  m_LocalPosition: {x: -0.2422146, y: 0.23529407, z: -0.110000744}
+  m_LocalScale: {x: 0.75999993, y: 0.75999993, z: 0.76}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1205037728}
-  m_Father: {fileID: 2115500169}
+  m_Father: {fileID: 575465933}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1632912587
 SpriteRenderer:
@@ -14383,7 +14380,7 @@ GameObject:
   - component: {fileID: 1680844711}
   - component: {fileID: 1680844712}
   m_Layer: 0
-  m_Name: Q1
+  m_Name: B1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -14467,7 +14464,7 @@ GameObject:
   - component: {fileID: 1692695150}
   - component: {fileID: 1692695151}
   m_Layer: 0
-  m_Name: Notebook 4
+  m_Name: Laptop4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -14482,12 +14479,12 @@ Transform:
   m_GameObject: {fileID: 1692695149}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 6.15, y: -3.38, z: -0.46790075}
-  m_LocalScale: {x: 2.1964, y: 2.1964, z: 2.1964002}
+  m_LocalPosition: {x: 0.29065746, y: 0.048442855, z: -0.110000744}
+  m_LocalScale: {x: 0.75999993, y: 0.75999993, z: 0.76}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 673356669}
-  m_Father: {fileID: 281370704}
+  m_Father: {fileID: 1781408034}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1692695151
 SpriteRenderer:
@@ -14623,7 +14620,7 @@ SpriteRenderer:
   m_Size: {x: 1, y: 1}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
+  m_WasSpriteAssigned: 0
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!114 &1698210254 stripped
@@ -14804,7 +14801,7 @@ GameObject:
   - component: {fileID: 1735572735}
   - component: {fileID: 1735572736}
   m_Layer: 0
-  m_Name: Pizza 1
+  m_Name: Pizza1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15180,7 +15177,7 @@ GameObject:
   - component: {fileID: 1758160952}
   - component: {fileID: 1758160953}
   m_Layer: 0
-  m_Name: Personagem 4
+  m_Name: Character3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15287,7 +15284,7 @@ GameObject:
   - component: {fileID: 1781408034}
   - component: {fileID: 1781408035}
   m_Layer: 0
-  m_Name: Mesa
+  m_Name: Table
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15305,7 +15302,11 @@ Transform:
   m_LocalPosition: {x: 5.31, y: -3.52, z: -0.15}
   m_LocalScale: {x: 2.89, y: 2.89, z: 2.89}
   m_ConstrainProportionsScale: 1
-  m_Children: []
+  m_Children:
+  - {fileID: 1271517841}
+  - {fileID: 226426343}
+  - {fileID: 1844705098}
+  - {fileID: 1692695150}
   m_Father: {fileID: 281370704}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1781408035
@@ -15467,7 +15468,7 @@ GameObject:
   - component: {fileID: 1844705098}
   - component: {fileID: 1844705099}
   m_Layer: 0
-  m_Name: Notebook 3
+  m_Name: Laptop3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15482,12 +15483,12 @@ Transform:
   m_GameObject: {fileID: 1844705097}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 4.4789195, y: -3.3882802, z: -0.46790123}
-  m_LocalScale: {x: 2.1964, y: 2.1964, z: 2.1964002}
+  m_LocalPosition: {x: -0.28757107, y: 0.04557779, z: -0.110000744}
+  m_LocalScale: {x: 0.75999993, y: 0.75999993, z: 0.76}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 704894839}
-  m_Father: {fileID: 281370704}
+  m_Father: {fileID: 1781408034}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &1844705099
 SpriteRenderer:
@@ -15563,7 +15564,7 @@ GameObject:
   - component: {fileID: 1876256868}
   - component: {fileID: 1876256869}
   m_Layer: 0
-  m_Name: Cadeira 1 (1)
+  m_Name: Char2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15669,7 +15670,7 @@ GameObject:
   - component: {fileID: 1900677555}
   - component: {fileID: 1900677556}
   m_Layer: 0
-  m_Name: Notebook
+  m_Name: Laptop1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15754,7 +15755,7 @@ GameObject:
   - component: {fileID: 1914858163}
   - component: {fileID: 1914858164}
   m_Layer: 0
-  m_Name: Q4
+  m_Name: B4
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15838,7 +15839,7 @@ GameObject:
   - component: {fileID: 1953714844}
   - component: {fileID: 1953714845}
   m_Layer: 0
-  m_Name: Cadeira 1
+  m_Name: Char1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15922,7 +15923,7 @@ GameObject:
   - component: {fileID: 1982376945}
   - component: {fileID: 1982376946}
   m_Layer: 0
-  m_Name: Monster 2
+  m_Name: Monster2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16110,7 +16111,7 @@ GameObject:
   - component: {fileID: 2024864448}
   - component: {fileID: 2024864449}
   m_Layer: 0
-  m_Name: Monster 3
+  m_Name: Monster3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16216,7 +16217,7 @@ GameObject:
   - component: {fileID: 2051881154}
   - component: {fileID: 2051881155}
   m_Layer: 0
-  m_Name: Light Center
+  m_Name: Light_Center
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16297,7 +16298,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2065556682}
   m_Layer: 0
-  m_Name: Mesa Zona 1
+  m_Name: Desk1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16316,8 +16317,8 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 627696147}
   - {fileID: 1421278412}
+  - {fileID: 627696147}
   m_Father: {fileID: 167391769}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2067729115
@@ -16331,7 +16332,7 @@ GameObject:
   - component: {fileID: 2067729116}
   - component: {fileID: 2067729117}
   m_Layer: 0
-  m_Name: F7
+  m_Name: W7
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16450,7 +16451,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2115500169}
   m_Layer: 0
-  m_Name: Mesa Zona 3
+  m_Name: Desk3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16470,7 +16471,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 575465933}
-  - {fileID: 1632912586}
   - {fileID: 1953714844}
   - {fileID: 423002448}
   m_Father: {fileID: 167391769}
@@ -16486,7 +16486,7 @@ GameObject:
   - component: {fileID: 2128970425}
   - component: {fileID: 2128970426}
   m_Layer: 0
-  m_Name: Q3
+  m_Name: B3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16570,7 +16570,7 @@ GameObject:
   - component: {fileID: 2137325552}
   - component: {fileID: 2137325553}
   m_Layer: 0
-  m_Name: F7 (1)
+  m_Name: W8
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
