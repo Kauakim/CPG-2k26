@@ -14527,7 +14527,7 @@ MonoBehaviour:
   timerPenalty: 8
   cardEarnThreshold: 5
   lobbyCountdownSeconds: 3
-  lobbyWaitSeconds: 3
+  lobbyWaitSeconds: 60
   opChoiceTimeout: 8
   cardChoiceTimeout: 12
   suddenDeathAfterTurn: 55

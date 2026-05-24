@@ -5,6 +5,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using ExitGames.Client.Photon;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// Orquestrador principal do jogo Hot Potato — versão multiplayer Photon PUN2.
@@ -21,7 +22,7 @@ public class HPGameManager : MonoBehaviourPun
     [SerializeField] private float timerPenalty            = 5f;
     [SerializeField] private float cardEarnThreshold      = 5f;
     [SerializeField] private int   lobbyCountdownSeconds   = 3;
-    [SerializeField] private float lobbyWaitSeconds        = 3f;
+    [SerializeField] private float lobbyWaitSeconds        = 60f;
     [SerializeField] private float opChoiceTimeout         = 5f;
     [SerializeField] private float cardChoiceTimeout       = 10f;
     [SerializeField] private int   suddenDeathAfterTurn    = 55;
@@ -76,12 +77,13 @@ public class HPGameManager : MonoBehaviourPun
     [SerializeField] private AudioClip   monsterClip;
     [SerializeField] private AudioClip   gepetoClip;
     [SerializeField] private AudioClip   tosseClip;
+    [SerializeField] private AudioClip   calculadoraClip;
     [SerializeField] private AudioClip   vidroClip;     // toca em erro e ao perder vida
 
     // ── Estado interno ────────────────────────────────────────────────────────
 
     private HPPhase  phase = HPPhase.Lobby;
-    private List<HPPlayer> players = new List<HPPlayer>();
+    private HPPlayer[] players;
 
     private int      currentPlayerIndex    = -1;
     private int      forcedNextPlayerIndex = -1;
@@ -93,8 +95,6 @@ public class HPGameManager : MonoBehaviourPun
 
     private int  turnCount;
     private int  consecutiveWrong;
-    private bool lastAnswerCorrect;
-    private bool hasPreviousAnswer;
     private bool resetExpressionNext;
     private int  turnsWithoutLifeLoss;
     private bool suddenDeathActive;
@@ -105,7 +105,7 @@ public class HPGameManager : MonoBehaviourPun
     private bool  resolvingTurn;
 
     // ── Mapeamento Photon → HPPlayer ──────────────────────────────────────────
-    // Chave: actor number do Photon. Valor: índice na lista players.
+    // Chave: actor number do Photon. Valor: índice do assento.
     private readonly Dictionary<int, int> actorToPlayerIndex = new Dictionary<int, int>();
 
     private float lobbyWaitTimer;
@@ -117,6 +117,12 @@ public class HPGameManager : MonoBehaviourPun
     private Coroutine passRoutine;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
+
+    private void Awake()
+    {
+        EnsurePlayersArray();
+        BindSeatInputs();
+    }
 
     private void Start()
     {
@@ -130,11 +136,13 @@ public class HPGameManager : MonoBehaviourPun
         SetupCardButtons();
 
         // Lobby permanece até o Photon confirmar entrada na sala (OnNetworkJoinedRoom)
+        ShowLobbyOnQuestionBoard(0, maxPlayers, 0, false);
         RefreshAllSeats(true);
     }
 
     private void Update()
     {
+        HandleLobbyCharacterClick();
         HandleLobbyTimer();
         HandleGameTimer();
         HandleTotalGameTimer();
@@ -159,9 +167,7 @@ public class HPGameManager : MonoBehaviourPun
         // Apenas o Master Client controla o timer do lobby
         if (!PhotonNetwork.IsMasterClient) return;
 
-        int seated = HPNetworkManager.Instance != null
-            ? HPNetworkManager.Instance.OccupiedSeatCount()
-            : players.Count;
+        int seated = ActivePlayerCount();
 
         if (seated < minPlayers)
         {
@@ -200,7 +206,42 @@ public class HPGameManager : MonoBehaviourPun
 
     private void RefreshLobbyView()
     {
-        lobbyView?.ShowLobby(players.Count, maxPlayers, 0, players.Count < maxPlayers);
+        int seated = ActivePlayerCount();
+        bool timerRunning = seated >= minPlayers;
+        int remaining = timerRunning
+            ? Mathf.CeilToInt(Mathf.Max(0f, lobbyWaitSeconds - lobbyWaitTimer))
+            : 0;
+
+        lobbyView?.ShowLobby(seated, maxPlayers, remaining);
+        ShowLobbyOnQuestionBoard(seated, maxPlayers, remaining, timerRunning);
+    }
+
+    private void ShowLobbyOnQuestionBoard(int seated, int max, int remaining, bool timerRunning)
+    {
+        if (phase != HPPhase.Lobby && phase != HPPhase.LobbyCountdown) return;
+
+        if (!timerRunning)
+        {
+            questionView?.ShowLobbyStatus(
+                "Esperando jogadores",
+                "Escolha seu personagem.\nAguardando pelo menos 2 jogadores.\n" + seated + "/" + max);
+            return;
+        }
+
+        questionView?.ShowLobbyStatus(
+            "Turma pronta",
+            "Escolha seu personagem.\nIniciando em " + remaining + "s\n" + seated + "/" + max);
+    }
+
+    private void HandleLobbyCharacterClick()
+    {
+        if (phase != HPPhase.Lobby && phase != HPPhase.LobbyCountdown) return;
+        if (sceneBridge == null) return;
+        if (!Input.GetMouseButtonDown(0)) return;
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+
+        if (sceneBridge.TryGetCharacterIndexAtScreenPosition(Input.mousePosition, out int seatIndex))
+            OnSeatClicked(seatIndex);
     }
 
     // ── Game timer ────────────────────────────────────────────────────────────
@@ -217,7 +258,9 @@ public class HPGameManager : MonoBehaviourPun
             ResolveTimeout();
         }
 
-        if (currentPlayerIndex >= 0 && currentPlayerIndex < players.Count)
+        if (currentPlayerIndex >= 0
+            && currentPlayerIndex < maxPlayers
+            && players[currentPlayerIndex] != null)
         {
             HPPlayer active = players[currentPlayerIndex];
             if (active.View != null)
@@ -240,23 +283,18 @@ public class HPGameManager : MonoBehaviourPun
     /// cinza = assento livre, branco = assento ocupado.
     public void RefreshCharacterVisuals()
     {
-        for (int i = 0; i < seatViews.Length; i++)
+        for (int i = 0; i < maxPlayers; i++)
         {
-            Transform slot = sceneBridge?.GetCharacterTransform(i);
-            if (slot == null) continue;
-
-            SpriteRenderer sr = slot.GetComponent<SpriteRenderer>();
-            if (sr == null) continue;
+            if (sceneBridge == null || sceneBridge.GetCharacterTransform(i) == null) continue;
 
             // Não sobrescreve a cor vermelha de eliminado
-            if (i < players.Count && players[i].Eliminated) continue;
+            if (players != null && i < players.Length && players[i] != null && players[i].Eliminated)
+                continue;
 
-            bool taken = HPNetworkManager.Instance != null
-                      && HPNetworkManager.Instance.GetSeatOwner(i) != 0;
+            bool taken = GetNetworkSeatOwner(i) != 0;
+            Color tint = taken ? Color.white : new Color(0.42f, 0.42f, 0.42f, 1f);
 
-            sr.color = taken
-                ? Color.white                            // escolhido → cor normal
-                : new Color(0.4f, 0.4f, 0.4f, 1f);     // livre → cinza
+            sceneBridge.SetCharacterTint(i, tint);
         }
     }
 
@@ -278,15 +316,13 @@ public class HPGameManager : MonoBehaviourPun
 
     private void BuildPlayersFromPhoton()
     {
-        players.Clear();
+        EnsurePlayersArray();
+        for (int i = 0; i < players.Length; i++) players[i] = null;
         actorToPlayerIndex.Clear();
-
-        if (HPNetworkManager.Instance == null) return;
 
         for (int seat = 0; seat < maxPlayers; seat++)
         {
-            Photon.Realtime.Player photonPlayer =
-                HPNetworkManager.Instance.GetPlayerAtSeat(seat);
+            Photon.Realtime.Player photonPlayer = GetNetworkPlayerAtSeat(seat);
             if (photonPlayer == null) continue;
 
             var hp = new HPPlayer
@@ -298,32 +334,23 @@ public class HPGameManager : MonoBehaviourPun
             if (seat < seatViews.Length && seatViews[seat] != null)
                 hp.View = seatViews[seat];
 
-            actorToPlayerIndex[photonPlayer.ActorNumber] = players.Count;
-            players.Add(hp);
+            actorToPlayerIndex[photonPlayer.ActorNumber] = seat;
+            players[seat] = hp;
         }
     }
 
-    // Mantidos para compatibilidade de Inspector (não fazem mais nada útil)
-    public void AddLocalPlayer() { }
-    public void AddBot()         { }
-
     // ── Lobby → Jogo ──────────────────────────────────────────────────────────
-
-    private void StartGameCountdown()
-    {
-        if (phase != HPPhase.Lobby) return;
-        if (!PhotonNetwork.IsMasterClient) return;
-        photonView.RPC(nameof(RPC_StartCountdown), RpcTarget.All);
-    }
 
     private IEnumerator CountdownRoutine()
     {
         for (int i = lobbyCountdownSeconds; i > 0; i--)
         {
             lobbyView?.ShowCountdown(i);
+            questionView?.ShowLobbyStatus("Começando", i + "...");
             yield return new WaitForSeconds(1f);
         }
         lobbyView?.ShowCountdown(0);
+        questionView?.ShowLobbyStatus("Começando", "Começar!");
         yield return new WaitForSeconds(0.45f);
 
         if (PhotonNetwork.IsMasterClient)
@@ -336,13 +363,13 @@ public class HPGameManager : MonoBehaviourPun
         totalGameTime = 0f;
 
         BuildPlayersFromPhoton();
-        HPNetworkManager.Instance?.MarkGameStarted();
+        MarkNetworkGameStarted();
 
         lobbyView?.HideAll();
         musicSystem?.StartMusic();
         vignetteController?.StartGame();
         currentPlayerIndex    = -1;
-        forcedNextPlayerIndex = Random.Range(0, players.Count);
+        forcedNextPlayerIndex = GetRandomAliveIndex();
         questionView?.ShowBoard();
         RefreshAllSeats(false);
         UpdateCardButtons();
@@ -373,7 +400,8 @@ public class HPGameManager : MonoBehaviourPun
 
         // Seleciona próximo jogador
         if (forcedNextPlayerIndex >= 0
-            && forcedNextPlayerIndex < players.Count
+            && forcedNextPlayerIndex < maxPlayers
+            && players[forcedNextPlayerIndex] != null
             && players[forcedNextPlayerIndex].Alive)
         {
             currentPlayerIndex    = forcedNextPlayerIndex;
@@ -431,8 +459,22 @@ public class HPGameManager : MonoBehaviourPun
         currentAnswerValue   = result.answerValue;
         currentExpression    = result.newExpression;
         resetExpressionNext  = false;
-        lastAnswerCorrect    = false;
-        hasPreviousAnswer    = false;
+    }
+
+    private void ResetExpressionNow()
+    {
+        if (questionSystem == null) return;
+
+        var result = questionSystem.PrepareQuestion(
+            turnCount, currentExpression, consecutiveWrong, true);
+        currentQuestionText = WrapTextAt30Chars(result.questionText);
+        currentAnswerValue  = result.answerValue;
+        currentExpression   = result.newExpression;
+
+        photonView.RPC(nameof(RPC_ResetExpression), RpcTarget.All,
+                       currentQuestionText,
+                       currentExpression.Text ?? "",
+                       HPQuestionSystem.FormatAnswer(currentAnswerValue));
     }
 
     /// <summary>
@@ -477,7 +519,8 @@ public class HPGameManager : MonoBehaviourPun
         // Só o Master valida
         if (!PhotonNetwork.IsMasterClient) return;
         if (resolvingTurn) return;
-        if (currentPlayerIndex < 0 || currentPlayerIndex >= players.Count) return;
+        if (currentPlayerIndex < 0 || currentPlayerIndex >= maxPlayers) return;
+        if (players[currentPlayerIndex] == null) return;
 
         // Verifica se quem enviou é realmente o jogador da vez
         if (actorToPlayerIndex.TryGetValue(info.Sender.ActorNumber, out int senderIdx))
@@ -542,7 +585,7 @@ public class HPGameManager : MonoBehaviourPun
 
     private static HPCardType RandomCard()
     {
-        HPCardType[] cards = { HPCardType.NP3, HPCardType.Atestado, HPCardType.Monster, HPCardType.GPT };
+        HPCardType[] cards = { HPCardType.NP3, HPCardType.Atestado, HPCardType.Monster, HPCardType.GPT, HPCardType.Calculadora };
         return cards[Random.Range(0, cards.Length)];
     }
 
@@ -588,7 +631,8 @@ public class HPGameManager : MonoBehaviourPun
     private void RPC_RequestUseCard(int slot, PhotonMessageInfo info)
     {
         if (!PhotonNetwork.IsMasterClient) return;
-        if (currentPlayerIndex < 0) return;
+        if (currentPlayerIndex < 0 || currentPlayerIndex >= maxPlayers) return;
+        if (players[currentPlayerIndex] == null) return;
 
         // Apenas o jogador da vez pode usar carta agora
         if (!actorToPlayerIndex.TryGetValue(info.Sender.ActorNumber, out int senderIdx)) return;
@@ -603,16 +647,15 @@ public class HPGameManager : MonoBehaviourPun
                        currentPlayerIndex, (int)card, slot);
     }
 
-    private void ConsumeCard(HPPlayer player, bool isFirstSlot)
+    private void ConsumeCard(HPPlayer player, int seatIndex, bool isFirstSlot)
     {
         if (isFirstSlot) player.HeldCard  = HPCardType.None;
         else             player.HeldCard2 = HPCardType.None;
 
-        int idx = players.IndexOf(player);
-        if (idx >= 0 && player.View != null)
+        if (seatIndex >= 0 && seatIndex < maxPlayers && player.View != null)
         {
-            player.View.SetPlayer(player, idx + 1);
-            player.View.SetActive(idx == currentPlayerIndex && player.Alive);
+            player.View.SetPlayer(player, seatIndex + 1);
+            player.View.SetActive(seatIndex == currentPlayerIndex && player.Alive);
         }
     }
 
@@ -620,9 +663,16 @@ public class HPGameManager : MonoBehaviourPun
 
     public void OnSeatClicked(int seatIndex)
     {
+        if (phase == HPPhase.Lobby || phase == HPPhase.LobbyCountdown)
+        {
+            RequestNetworkSeat(seatIndex);
+            return;
+        }
+
         if (!selectingAtestadoTarget) return;
-        if (seatIndex < 0 || seatIndex >= players.Count) return;
-        if (seatIndex == currentPlayerIndex || !players[seatIndex].Alive) return;
+        if (seatIndex < 0 || seatIndex >= maxPlayers) return;
+        if (seatIndex == currentPlayerIndex) return;
+        if (players[seatIndex] == null || !players[seatIndex].Alive) return;
 
         selectingAtestadoTarget = false;
         SetTargetSelection(false);
@@ -631,8 +681,9 @@ public class HPGameManager : MonoBehaviourPun
 
     private void SetTargetSelection(bool enabled)
     {
-        for (int i = 0; i < players.Count; i++)
+        for (int i = 0; i < maxPlayers; i++)
         {
+            if (players[i] == null) continue;
             bool validTarget = enabled && i != currentPlayerIndex && players[i].Alive;
             if (players[i].View != null) players[i].View.SetTargetHint(validTarget);
         }
@@ -697,7 +748,7 @@ public class HPGameManager : MonoBehaviourPun
         if (PhotonNetwork.IsMasterClient)
         {
             HPPlayer winner = GetWinner();
-            int winnerIdx   = winner != null ? players.IndexOf(winner) : -1;
+            int winnerIdx   = winner != null ? System.Array.IndexOf(players, winner) : -1;
             photonView.RPC(nameof(RPC_EndGame), RpcTarget.All, winnerIdx);
         }
     }
@@ -717,7 +768,7 @@ public class HPGameManager : MonoBehaviourPun
         if (useCardButton1 != null) useCardButton1.gameObject.SetActive(false);
         if (useCardButton2 != null) useCardButton2.gameObject.SetActive(false);
 
-        string winnerName = (winnerIndex >= 0 && winnerIndex < players.Count)
+        string winnerName = (winnerIndex >= 0 && winnerIndex < maxPlayers && players[winnerIndex] != null)
             ? players[winnerIndex].Name : "Ninguém";
         resultView?.Show(winnerName);
     }
@@ -741,8 +792,6 @@ public class HPGameManager : MonoBehaviourPun
         turnCount               = 0;
         consecutiveWrong        = 0;
         currentTurnId           = 0;
-        lastAnswerCorrect       = false;
-        hasPreviousAnswer       = false;
         resetExpressionNext     = false;
         currentQuestionText     = "";
         currentAnswerValue      = 0;
@@ -751,7 +800,7 @@ public class HPGameManager : MonoBehaviourPun
         currentTimerMax         = timerMax;
         lobbyWaitTimer          = 0f;
         totalGameTime           = 0f;
-        players.Clear();
+        ClearPlayers();
         actorToPlayerIndex.Clear();
 
         if (suddenDeathText != null) suddenDeathText.gameObject.SetActive(false);
@@ -780,14 +829,22 @@ public class HPGameManager : MonoBehaviourPun
     {
         bool sceneMode = sceneBridge != null;
         if (sceneMode)
-            sceneBridge.SetPlayerCount(players.Count);
+        {
+            if (lobbyLayout)
+                sceneBridge.SetPlayerCount(maxPlayers);
+            else
+            {
+                for (int i = 0; i < maxPlayers; i++)
+                    sceneBridge.SetPlayerActive(i, players[i] != null);
+            }
+        }
 
         for (int i = 0; i < seatViews.Length; i++)
         {
             HPSeatView view = seatViews[i];
             if (view == null) continue;
 
-            HPPlayer player   = i < players.Count ? players[i] : null;
+            HPPlayer player   = i < maxPlayers ? players[i] : null;
             bool     hasPlayer = player != null;
 
             view.gameObject.SetActive(lobbyLayout ? true : hasPlayer);
@@ -798,14 +855,16 @@ public class HPGameManager : MonoBehaviourPun
             view.SetActive(isActive);
             view.SetBadge(player.Eliminated, "DP");
         }
+
+        RefreshCharacterVisuals();
     }
 
     private void RefreshActivePlayerView()
     {
-        for (int i = 0; i < players.Count; i++)
+        for (int i = 0; i < maxPlayers; i++)
         {
             HPPlayer player = players[i];
-            if (player.View == null) continue;
+            if (player == null || player.View == null) continue;
             player.View.SetPlayer(player, i + 1);
             player.View.SetActive(i == currentPlayerIndex && player.Alive);
             player.View.SetLamp(Color.clear, false);
@@ -826,7 +885,7 @@ public class HPGameManager : MonoBehaviourPun
 
         bool show = phase == HPPhase.Playing;
         btn.gameObject.SetActive(show);
-        if (!show || currentPlayerIndex < 0 || currentPlayerIndex >= players.Count)
+        if (!show || currentPlayerIndex < 0 || currentPlayerIndex >= maxPlayers || players[currentPlayerIndex] == null)
         {
             if (icon != null) icon.color = Color.clear;
             return;
@@ -856,6 +915,7 @@ public class HPGameManager : MonoBehaviourPun
             case HPCardType.Atestado: return AliveCount() > 1;
             case HPCardType.Monster:  return timerSystem != null && timerSystem.Running && timerSystem.Remaining > 0f;
             case HPCardType.GPT:      return true;
+            case HPCardType.Calculadora: return questionSystem != null;
             default:                  return false;
         }
     }
@@ -864,6 +924,7 @@ public class HPGameManager : MonoBehaviourPun
     {
         // Os ícones de cartas vêm do HPCardView — reutiliza se disponível
         // Como alternativa, pode-se adicionar [SerializeField] próprio aqui.
+        if (cardView != null) return cardView.GetBackgroundSprite(cardType);
         return null;
     }
 
@@ -877,25 +938,30 @@ public class HPGameManager : MonoBehaviourPun
         lastAnswerText.color = HPCardInfo.Hex("#27e36f");
     }
 
-    // ── Bot ───────────────────────────────────────────────────────────────────
-
-    private void StopBotRoutine() { /* removido — sem bots */ }
-
     // ── RPCs Photon ───────────────────────────────────────────────────────────
 
     [PunRPC]
     private void RPC_SyncLobbyUI(int seated, int max, int remaining, bool canStart)
     {
         if (canStart)
-            lobbyView?.ShowLobby(seated, max, remaining, seated < max);
+        {
+            lobbyView?.ShowLobby(seated, max, remaining);
+            ShowLobbyOnQuestionBoard(seated, max, remaining, true);
+        }
         else
-            lobbyView?.ShowLobby(seated, max, 0, false);
+        {
+            lobbyView?.ShowLobby(seated, max, 0);
+            ShowLobbyOnQuestionBoard(seated, max, 0, false);
+        }
     }
 
     [PunRPC]
     private void RPC_SyncLobbyCountdown(int seconds)
     {
         lobbyView?.ShowCountdown(seconds);
+        questionView?.ShowLobbyStatus(
+            "Começando",
+            seconds > 0 ? seconds + "..." : "Começar!");
     }
 
     [PunRPC]
@@ -927,7 +993,8 @@ public class HPGameManager : MonoBehaviourPun
             HasValue = exprHasValue
         };
 
-        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        if (playerIndex < 0 || playerIndex >= maxPlayers) return;
+        if (players[playerIndex] == null) return;
         HPPlayer player = players[playerIndex];
 
         sceneBridge?.SetActivePlayer(playerIndex);
@@ -948,7 +1015,7 @@ public class HPGameManager : MonoBehaviourPun
     [PunRPC]
     private void RPC_OnAnswerCorrect(int playerIndex, string answer, bool earnedCard)
     {
-        if (playerIndex >= 0 && playerIndex < players.Count)
+        if (playerIndex >= 0 && playerIndex < maxPlayers && players[playerIndex] != null)
             UpdateLastAnswer(players[playerIndex].Name, answer);
         questionView?.SetInteractable(false);
         PlaySfx(null); // som de acerto opcional
@@ -959,7 +1026,8 @@ public class HPGameManager : MonoBehaviourPun
     {
         PlaySfx(vidroClip);
         timerSystem?.Penalize(penalty);
-        if (playerIndex >= 0 && playerIndex < players.Count
+        if (playerIndex >= 0 && playerIndex < maxPlayers
+            && players[playerIndex] != null
             && players[playerIndex].IsLocal)
             questionView?.SetInteractable(true);
     }
@@ -967,7 +1035,8 @@ public class HPGameManager : MonoBehaviourPun
     [PunRPC]
     private void RPC_ShowOperationChoice(int playerIndex, string[] ops, bool earnedCard)
     {
-        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        if (playerIndex < 0 || playerIndex >= maxPlayers) return;
+        if (players[playerIndex] == null) return;
         HPPlayer player = players[playerIndex];
 
         if (player.IsLocal)
@@ -998,7 +1067,8 @@ public class HPGameManager : MonoBehaviourPun
         if (earnedCard)
         {
             HPPlayer player = players[currentPlayerIndex];
-            MasterGiveCard(player, currentPlayerIndex);
+            if (player != null)
+                MasterGiveCard(player, currentPlayerIndex);
         }
         photonView.RPC(nameof(RPC_PassTurn), RpcTarget.All, 0.35f);
     }
@@ -1017,9 +1087,35 @@ public class HPGameManager : MonoBehaviourPun
     }
 
     [PunRPC]
+    private void RPC_ResetExpression(string questionText, string exprText, string answerStr)
+    {
+        currentQuestionText = WrapTextAt30Chars(questionText);
+        double.TryParse(answerStr, NumberStyles.Any,
+                        CultureInfo.InvariantCulture, out currentAnswerValue);
+        currentExpression = new HPQuestionSystem.ExpressionState
+        {
+            Text     = exprText,
+            Value    = currentAnswerValue,
+            HasValue = true
+        };
+        questionView?.UpdateQuestion(currentQuestionText);
+        opChoiceView?.Hide();
+
+        if (currentPlayerIndex >= 0
+            && currentPlayerIndex < maxPlayers
+            && players[currentPlayerIndex] != null
+            && players[currentPlayerIndex].IsLocal)
+        {
+            questionView?.SetInputText("");
+            questionView?.SetInteractable(true);
+        }
+    }
+
+    [PunRPC]
     private void RPC_GiveCard(int playerIndex, int slot, int cardType)
     {
-        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        if (playerIndex < 0 || playerIndex >= maxPlayers) return;
+        if (players[playerIndex] == null) return;
         HPPlayer player = players[playerIndex];
         HPCardType type = (HPCardType)cardType;
 
@@ -1034,7 +1130,8 @@ public class HPGameManager : MonoBehaviourPun
     [PunRPC]
     private void RPC_ApplyCardEffect(int playerIndex, int cardTypeInt, int slot)
     {
-        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        if (playerIndex < 0 || playerIndex >= maxPlayers) return;
+        if (players[playerIndex] == null) return;
         HPPlayer   player   = players[playerIndex];
         HPCardType cardType = (HPCardType)cardTypeInt;
         bool       isFirst  = slot == 0;
@@ -1047,18 +1144,18 @@ public class HPGameManager : MonoBehaviourPun
         {
             case HPCardType.NP3:
                 player.Lives = Mathf.Min(3, player.Lives + 1);
-                ConsumeCard(player, isFirst);
+                ConsumeCard(player, playerIndex, isFirst);
                 break;
 
             case HPCardType.Monster:
                 musicSystem?.SetSpeed(0.75f);
                 timerSystem?.SetRemainingTime(
                     timerSystem != null ? timerSystem.Remaining * 2f : timerMax);
-                ConsumeCard(player, isFirst);
+                ConsumeCard(player, playerIndex, isFirst);
                 break;
 
             case HPCardType.GPT:
-                ConsumeCard(player, isFirst);
+                ConsumeCard(player, playerIndex, isFirst);
                 UpdateLastAnswer(player.Name, HPQuestionSystem.FormatAnswer(currentAnswerValue));
                 questionView?.SetInteractable(false);
                 if (PhotonNetwork.IsMasterClient)
@@ -1071,7 +1168,13 @@ public class HPGameManager : MonoBehaviourPun
                     selectingAtestadoTarget = true;
                     SetTargetSelection(true);
                 }
-                ConsumeCard(player, isFirst);
+                ConsumeCard(player, playerIndex, isFirst);
+                break;
+
+            case HPCardType.Calculadora:
+                ConsumeCard(player, playerIndex, isFirst);
+                if (PhotonNetwork.IsMasterClient)
+                    ResetExpressionNow();
                 break;
         }
         UpdateCardButtons();
@@ -1096,13 +1199,17 @@ public class HPGameManager : MonoBehaviourPun
             case HPCardType.Atestado:
                 PlaySfx(tosseClip);
                 break;
+            case HPCardType.Calculadora:
+                PlaySfx(calculadoraClip);
+                break;
         }
     }
 
     [PunRPC]
     private void RPC_ApplyLifeLoss(int playerIndex)
     {
-        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        if (playerIndex < 0 || playerIndex >= maxPlayers) return;
+        if (players[playerIndex] == null) return;
         HPPlayer player = players[playerIndex];
         player.Lives = Mathf.Max(0, player.Lives - 1);
         if (player.Lives <= 0)
@@ -1156,6 +1263,8 @@ public class HPGameManager : MonoBehaviourPun
     private void MasterGiveCard(HPPlayer player, int playerIndex)
     {
         if (!PhotonNetwork.IsMasterClient) return;
+        if (player == null) return;
+        if (player.HeldCard != HPCardType.None && player.HeldCard2 != HPCardType.None) return;
         HPCardType optA = RandomCard();
         HPCardType optB = RandomCardDifferentFrom(optA);
 
@@ -1178,7 +1287,8 @@ public class HPGameManager : MonoBehaviourPun
     [PunRPC]
     private void RPC_ShowCardChoice(int playerIndex, int cardA, int cardB, int slot)
     {
-        if (playerIndex < 0 || playerIndex >= players.Count) return;
+        if (playerIndex < 0 || playerIndex >= maxPlayers) return;
+        if (players[playerIndex] == null) return;
         HPPlayer player = players[playerIndex];
         if (!player.IsLocal) return;
 
@@ -1220,28 +1330,105 @@ public class HPGameManager : MonoBehaviourPun
 
     // ── Utilitários ───────────────────────────────────────────────────────────
 
+    private void BindSeatInputs()
+    {
+        if (seatViews == null) return;
+        for (int i = 0; i < seatViews.Length; i++)
+            if (seatViews[i] != null)
+                seatViews[i].BindSeatIndex(i, this);
+    }
+
+    private void EnsurePlayersArray()
+    {
+        if (players == null || players.Length != maxPlayers)
+            players = new HPPlayer[maxPlayers];
+    }
+
+    private void ClearPlayers()
+    {
+        EnsurePlayersArray();
+        for (int i = 0; i < players.Length; i++) players[i] = null;
+    }
+
+    private int ActivePlayerCount()
+    {
+        if (HPNetworkManager.Instance != null)
+            return HPNetworkManager.Instance.OccupiedSeatCount();
+        if (HPNetworkClient.Instance != null)
+            return HPNetworkClient.Instance.OccupiedSeatCount();
+        int c = 0;
+        for (int i = 0; i < maxPlayers; i++)
+            if (players[i] != null) c++;
+        return c;
+    }
+
+    private int GetNetworkSeatOwner(int seatIndex)
+    {
+        if (HPNetworkManager.Instance != null)
+            return HPNetworkManager.Instance.GetSeatOwner(seatIndex);
+        if (HPNetworkClient.Instance != null)
+            return HPNetworkClient.Instance.GetSeatOwner(seatIndex);
+        return 0;
+    }
+
+    private Photon.Realtime.Player GetNetworkPlayerAtSeat(int seatIndex)
+    {
+        if (HPNetworkManager.Instance != null)
+            return HPNetworkManager.Instance.GetPlayerAtSeat(seatIndex);
+        if (HPNetworkClient.Instance != null)
+            return HPNetworkClient.Instance.GetPlayerAtSeat(seatIndex);
+        return null;
+    }
+
+    private void RequestNetworkSeat(int seatIndex)
+    {
+        if (HPNetworkManager.Instance != null)
+        {
+            HPNetworkManager.Instance.RequestSeat(seatIndex);
+            return;
+        }
+        HPNetworkClient.Instance?.RequestSeat(seatIndex);
+    }
+
+    private void MarkNetworkGameStarted()
+    {
+        HPNetworkManager.Instance?.MarkGameStarted();
+    }
+
+    private int GetRandomAliveIndex()
+    {
+        if (AliveCount() == 0) return -1;
+        int start = Random.Range(0, maxPlayers);
+        for (int step = 0; step < maxPlayers; step++)
+        {
+            int idx = (start + step) % maxPlayers;
+            if (players[idx] != null && players[idx].Alive) return idx;
+        }
+        return -1;
+    }
+
     private int AliveCount()
     {
         int c = 0;
-        for (int i = 0; i < players.Count; i++)
-            if (players[i].Alive) c++;
+        for (int i = 0; i < maxPlayers; i++)
+            if (players[i] != null && players[i].Alive) c++;
         return c;
     }
 
     private HPPlayer GetWinner()
     {
-        for (int i = 0; i < players.Count; i++)
-            if (players[i].Alive) return players[i];
+        for (int i = 0; i < maxPlayers; i++)
+            if (players[i] != null && players[i].Alive) return players[i];
         return null;
     }
 
     private int GetNextAliveIndex(int from)
     {
-        if (players.Count == 0) return -1;
-        for (int step = 1; step <= players.Count; step++)
+        if (AliveCount() == 0) return -1;
+        for (int step = 1; step <= maxPlayers; step++)
         {
-            int idx = (from + step + players.Count) % players.Count;
-            if (players[idx].Alive) return idx;
+            int idx = (from + step + maxPlayers) % maxPlayers;
+            if (players[idx] != null && players[idx].Alive) return idx;
         }
         return -1;
     }

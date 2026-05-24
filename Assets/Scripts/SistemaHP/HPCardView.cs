@@ -26,6 +26,7 @@ public class HPCardView : MonoBehaviour
     [SerializeField] private Sprite bgAtestado;
     [SerializeField] private Sprite bgMonster;
     [SerializeField] private Sprite bgGPT;
+    [SerializeField] private Sprite bgCalculadora;
 
     [Header("Overlay de animação (filho da Canvas, inativo por padrão)")]
     [SerializeField] private GameObject  animOverlay;
@@ -36,6 +37,7 @@ public class HPCardView : MonoBehaviour
     [Header("Frames de animação (sprites fatiados de sheet)")]
     [SerializeField] private Sprite[] monsterFrames;
     [SerializeField] private Sprite[] gptFrames;
+    [SerializeField] private Sprite[] calculadoraFrames;
 
     [Header("Notificação flutuante de carta (filho da Canvas, inativo por padrão)")]
     [SerializeField] private GameObject    floatingRoot;
@@ -229,10 +231,20 @@ public class HPCardView : MonoBehaviour
             case HPCardType.Atestado: return bgAtestado;
             case HPCardType.Monster:  return bgMonster;
             case HPCardType.GPT:      return bgGPT;
+            case HPCardType.Calculadora: return bgCalculadora;
             default:                  return null;
         }
     }
 
-    private Sprite[] GetAnimFrames(HPCardType t) =>
-        t == HPCardType.GPT ? gptFrames : monsterFrames;
+    private Sprite[] GetAnimFrames(HPCardType t)
+    {
+        switch (t)
+        {
+            case HPCardType.GPT:         return gptFrames;
+            case HPCardType.Calculadora: return calculadoraFrames != null && calculadoraFrames.Length > 0
+                                            ? calculadoraFrames
+                                            : monsterFrames;
+            default:                     return monsterFrames;
+        }
+    }
 }

@@ -5,10 +5,10 @@ using ExitGames.Client.Photon;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// Gerencia conexão Photon com fluxo automático:
-/// — Quem inicia o jogo vira host e cria a sala automaticamente.
-/// — Quem acessa via link entra direto na sala sem nenhuma interface extra.
-/// — Primeiro personagem disponível é atribuído automaticamente a todos.
+/// Gerencia conexão Photon com fluxo de entrada:
+/// — Jogador escolhe Host ou Entrar.
+/// — Ao entrar, informa o código da sala (URL apenas preenche).
+/// — Assentos são escolhidos manualmente antes do jogo começar.
 [RequireComponent(typeof(PhotonView))]
 public class HPNetworkManager : MonoBehaviourPunCallbacks
 {
@@ -23,6 +23,15 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
     [SerializeField] private GameObject waitingPanel;   // exibido enquanto conecta
     [SerializeField] private Text       statusText;     // "Conectando…" / "Aguardando…"
     [SerializeField] private Text       linkText;       // exibe o link compartilhável
+
+    [Header("UI — Entrada (Host/Entrar)")]
+    [SerializeField] private GameObject entryPanel;
+    [SerializeField] private Button     hostButton;
+    [SerializeField] private Button     joinButton;
+    [SerializeField] private GameObject joinPanel;
+    [SerializeField] private InputField joinRoomInput;
+    [SerializeField] private Button     joinConfirmButton;
+    [SerializeField] private Text       entryErrorText;
 
     [Header("UI — Código da sala (opcional)")]
     [SerializeField] private Text       roomCodeDisplay; // exibe apenas o código (ex: "XKBR") no canto superior esquerdo
@@ -39,7 +48,8 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
     private const string ROOM_STARTED_KEY = "gs";
     private const string URL_PARAM        = "room";   // ?room=XKBR
 
-    private string pendingRoomCode = null;  // código lido da URL ao conectar
+    private string pendingRoomCode = null;  // código informado pelo usuário
+    private bool   isConnecting;
 
     // ── Unity lifecycle ───────────────────────────────────────────────────────
 
@@ -49,21 +59,104 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
         Instance = this;
     }
 
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
     private void Start()
     {
+        if (gameManager == null)
+            gameManager = FindObjectOfType<HPGameManager>();
+        if (roomCodeDisplay == null)
+            roomCodeDisplay = FindTextByName("RoomCodeDisplay");
+
         PhotonNetwork.GameVersion            = gameVersion;
         PhotonNetwork.AutomaticallySyncScene = false;
         PhotonNetwork.NickName               = "Jogador";
 
-        pendingRoomCode = ReadRoomCodeFromURL();
+        SetupEntryUI();
 
-        Debug.Log($"[Network] Iniciando — modo: {(pendingRoomCode != null ? "CLIENTE (código: " + pendingRoomCode + ")" : "HOST")}");
-        Debug.Log("[Network] Tentando conectar ao Photon...");
+        if (waitingPanel != null) waitingPanel.SetActive(false);
+        SetStatus("");
+        ShowEntry(true);
+    }
 
+    private void SetupEntryUI()
+    {
+        string urlCode = ReadRoomCodeFromURL();
+        if (joinRoomInput != null && !string.IsNullOrEmpty(urlCode))
+            joinRoomInput.text = urlCode;
+
+        if (hostButton != null)
+        {
+            hostButton.onClick.RemoveAllListeners();
+            hostButton.onClick.AddListener(StartHost);
+        }
+        if (joinButton != null)
+        {
+            joinButton.onClick.RemoveAllListeners();
+            joinButton.onClick.AddListener(ShowJoinPanel);
+        }
+        if (joinConfirmButton != null)
+        {
+            joinConfirmButton.onClick.RemoveAllListeners();
+            joinConfirmButton.onClick.AddListener(StartJoin);
+        }
+
+        if (joinPanel != null) joinPanel.SetActive(false);
+        SetEntryError("");
+    }
+
+    private void ShowJoinPanel()
+    {
+        if (joinPanel != null) joinPanel.SetActive(true);
+        if (joinRoomInput != null)
+        {
+            joinRoomInput.Select();
+            joinRoomInput.ActivateInputField();
+        }
+    }
+
+    private void StartHost()
+    {
+        pendingRoomCode = null;
+        StartConnection();
+    }
+
+    private void StartJoin()
+    {
+        string code = joinRoomInput != null ? joinRoomInput.text.Trim() : "";
+        if (string.IsNullOrEmpty(code))
+        {
+            SetEntryError("Digite o código da sala.");
+            return;
+        }
+        pendingRoomCode = code;
+        StartConnection();
+    }
+
+    private void StartConnection()
+    {
+        if (isConnecting) return;
+        isConnecting = true;
+        SetEntryError("");
+        ShowEntry(false);
         SetStatus(pendingRoomCode != null ? "Entrando na sessão..." : "Iniciando sessão...");
         if (waitingPanel != null) waitingPanel.SetActive(true);
-
+        Debug.Log("[Network] Tentando conectar ao Photon...");
         PhotonNetwork.ConnectUsingSettings();
+    }
+
+    private void ShowEntry(bool show)
+    {
+        if (entryPanel != null) entryPanel.SetActive(show);
+        if (!show && joinPanel != null) joinPanel.SetActive(false);
+    }
+
+    private void SetEntryError(string msg)
+    {
+        if (entryErrorText != null) entryErrorText.text = msg;
     }
 
     // ── Callbacks Photon — Conexão ────────────────────────────────────────────
@@ -77,7 +170,7 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
     public override void OnJoinedLobby()
     {
         Debug.Log("[Network] ✓ Lobby Photon pronto.");
-        if (pendingRoomCode != null)
+        if (!string.IsNullOrEmpty(pendingRoomCode))
         {
             Debug.Log($"[Network] Tentando entrar na sala: {pendingRoomCode}");
             JoinRoom(pendingRoomCode);
@@ -93,6 +186,9 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
     {
         Debug.LogWarning($"[Network] ✗ Desconectado: {cause}");
         SetStatus("Desconectado: " + cause);
+        isConnecting = false;
+        if (waitingPanel != null) waitingPanel.SetActive(false);
+        ShowEntry(true);
     }
 
     // ── Criar / Entrar ────────────────────────────────────────────────────────
@@ -119,8 +215,8 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
 
     public override void OnJoinedRoom()
     {
-        // Ocupa o primeiro assento livre automaticamente
-        ClaimFirstAvailableSeat();
+        // Libera assento atual; o jogador escolhe manualmente depois
+        ClearLocalSeat();
 
         // Exibe o link compartilhável para o host
         string code = PhotonNetwork.CurrentRoom.Name;
@@ -136,22 +232,31 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
             Debug.LogWarning("[Network] ⚠️ roomCodeDisplay está NULL! Verifique o Inspector do NetworkManager!");
         }
 
-        SetStatus("Na sessão — código: " + code);
+        SetStatus("Na sessão — escolha um personagem.");
+        isConnecting = false;
+        if (waitingPanel != null) waitingPanel.SetActive(false);
         RefreshSeats();
         gameManager?.OnNetworkJoinedRoom();
     }
 
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
-        // Sala não existe ou cheia → cria uma nova
-        SetStatus("Sessão não encontrada, criando nova...");
-        pendingRoomCode = null;
-        CreateRoom();
+        Debug.LogWarning($"[Network] Falha ao entrar na sala ({returnCode}): {message}");
+        SetStatus("Falha ao entrar na sala.");
+        SetEntryError("Sessão não encontrada ou indisponível.");
+        isConnecting = false;
+        if (waitingPanel != null) waitingPanel.SetActive(false);
+        ShowEntry(true);
     }
 
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
-        SetStatus("Erro ao criar sessão: " + message);
+        Debug.LogWarning($"[Network] Falha ao criar sala ({returnCode}): {message}");
+        SetStatus("Erro ao criar sessão.");
+        SetEntryError("Não foi possível criar a sessão.");
+        isConnecting = false;
+        if (waitingPanel != null) waitingPanel.SetActive(false);
+        ShowEntry(true);
     }
 
     // ── Callbacks de sala ─────────────────────────────────────────────────────
@@ -181,23 +286,48 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
 
     // ── Assentos ──────────────────────────────────────────────────────────────
 
-    private void ClaimFirstAvailableSeat()
+    public void RequestSeat(int seatIndex)
     {
-        // Libera assento anterior antes de pegar novo
+        if (PhotonNetwork.CurrentRoom == null) return;
+        if (IsGameStarted()) return;
+        photonView.RPC(nameof(RPC_RequestSeat), RpcTarget.MasterClient, seatIndex);
+    }
+
+    [PunRPC]
+    private void RPC_RequestSeat(int seatIndex, PhotonMessageInfo info)
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+        if (IsGameStarted()) return;
+        if (seatIndex < 0 || seatIndex >= 8) return;
+        if (GetSeatOwner(seatIndex) != 0) return;
+
+        photonView.RPC(nameof(RPC_ConfirmSeat), info.Sender, seatIndex);
+    }
+
+    [PunRPC]
+    private void RPC_ConfirmSeat(int seatIndex)
+    {
+        if (PhotonNetwork.CurrentRoom == null) return;
+        if (IsGameStarted()) return;
+        if (seatIndex < 0 || seatIndex >= 8) return;
+        SetLocalSeat(seatIndex);
+        RefreshSeats();
+    }
+
+    private void ClearLocalSeat()
+    {
+        if (PhotonNetwork.LocalPlayer == null) return;
         var release = new Hashtable();
         for (int i = 0; i < 8; i++) release[SEAT_KEY_PREFIX + i] = false;
         PhotonNetwork.LocalPlayer.SetCustomProperties(release);
+    }
 
-        for (int i = 0; i < 8; i++)
-        {
-            if (GetSeatOwner(i) != 0) continue;
-
-            var claim = new Hashtable();
-            for (int j = 0; j < 8; j++) claim[SEAT_KEY_PREFIX + j] = false;
-            claim[SEAT_KEY_PREFIX + i] = true;
-            PhotonNetwork.LocalPlayer.SetCustomProperties(claim);
-            return;
-        }
+    private void SetLocalSeat(int seatIndex)
+    {
+        var claim = new Hashtable();
+        for (int i = 0; i < 8; i++) claim[SEAT_KEY_PREFIX + i] = false;
+        claim[SEAT_KEY_PREFIX + seatIndex] = true;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(claim);
     }
 
     public int GetSeatOwner(int idx)
@@ -325,5 +455,11 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
     {
         if (statusText != null) statusText.text = msg;
         Debug.Log("[Network] " + msg);
+    }
+
+    private static Text FindTextByName(string objectName)
+    {
+        GameObject go = GameObject.Find(objectName);
+        return go != null ? go.GetComponent<Text>() : null;
     }
 }

@@ -9,12 +9,14 @@ using UnityEngine.UI;
 [RequireComponent(typeof(PhotonView))]
 public class HPNetworkClient : MonoBehaviourPunCallbacks
 {
+    public static HPNetworkClient Instance { get; private set; }
+
     [Header("Referência ao GameManager")]
     [SerializeField] private HPGameManager gameManager;
 
     [Header("UI (opcional)")]
     [SerializeField] private Text statusText;
-    [SerializeField] private Text linkText;
+    [SerializeField] private Text roomCodeDisplay;
 
     [Header("Labels de nome sobre cada personagem (opcional)")]
     [SerializeField] private Text[] seatLabels = new Text[8];
@@ -25,8 +27,31 @@ public class HPNetworkClient : MonoBehaviourPunCallbacks
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
+    }
+
     private void Start()
     {
+        if (HPNetworkManager.Instance != null)
+        {
+            Debug.LogWarning("[Client] HPNetworkManager já está ativo — desabilitando HPNetworkClient.");
+            enabled = false;
+            return;
+        }
+
+        if (gameManager == null)
+            gameManager = FindObjectOfType<HPGameManager>();
+        if (roomCodeDisplay == null)
+            roomCodeDisplay = FindTextByName("RoomCodeDisplay");
+
         PhotonNetwork.GameVersion            = "1.0";
         PhotonNetwork.AutomaticallySyncScene = false;
         PhotonNetwork.NickName               = "Jogador";
@@ -65,9 +90,10 @@ public class HPNetworkClient : MonoBehaviourPunCallbacks
     {
         string code = PhotonNetwork.CurrentRoom.Name;
         Debug.Log($"[Client] ✓ Entrou na sala {code}. Jogadores: {PhotonNetwork.CurrentRoom.PlayerCount}");
-        SetStatus("Na sessão — código: " + code);
+        if (roomCodeDisplay != null) roomCodeDisplay.text = code;
+        SetStatus("Na sessão — escolha um personagem. Código: " + code);
 
-        ClaimFirstAvailableSeat();
+        ClearLocalSeat();
         RefreshSeats();
         gameManager?.OnNetworkJoinedRoom();
     }
@@ -102,24 +128,14 @@ public class HPNetworkClient : MonoBehaviourPunCallbacks
 
     // ── Assentos ──────────────────────────────────────────────────────────────
 
-    private void ClaimFirstAvailableSeat()
+    public void RequestSeat(int seatIndex)
     {
-        var release = new Hashtable();
-        for (int i = 0; i < 8; i++) release[SEAT_KEY_PREFIX + i] = false;
-        PhotonNetwork.LocalPlayer.SetCustomProperties(release);
-
-        for (int i = 0; i < 8; i++)
-        {
-            if (GetSeatOwner(i) != 0) continue;
-            var claim = new Hashtable();
-            for (int j = 0; j < 8; j++) claim[SEAT_KEY_PREFIX + j] = false;
-            claim[SEAT_KEY_PREFIX + i] = true;
-            PhotonNetwork.LocalPlayer.SetCustomProperties(claim);
-            Debug.Log($"[Client] Assento {i} ocupado.");
-            return;
-        }
-
-        Debug.LogWarning("[Client] Nenhum assento disponível.");
+        if (PhotonNetwork.CurrentRoom == null) return;
+        if (IsGameStarted()) return;
+        if (seatIndex < 0 || seatIndex >= 8) return;
+        if (GetSeatOwner(seatIndex) != 0) return;
+        SetLocalSeat(seatIndex);
+        RefreshSeats();
     }
 
     public int GetSeatOwner(int idx)
@@ -131,6 +147,13 @@ public class HPNetworkClient : MonoBehaviourPunCallbacks
         return 0;
     }
 
+    public int OccupiedSeatCount()
+    {
+        int c = 0;
+        for (int i = 0; i < 8; i++) if (GetSeatOwner(i) != 0) c++;
+        return c;
+    }
+
     public Player GetPlayerAtSeat(int idx)
     {
         int actor = GetSeatOwner(idx);
@@ -138,6 +161,29 @@ public class HPNetworkClient : MonoBehaviourPunCallbacks
         foreach (var p in PhotonNetwork.PlayerList)
             if (p.ActorNumber == actor) return p;
         return null;
+    }
+
+    private void ClearLocalSeat()
+    {
+        if (PhotonNetwork.LocalPlayer == null) return;
+        var release = new Hashtable();
+        for (int i = 0; i < 8; i++) release[SEAT_KEY_PREFIX + i] = false;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(release);
+    }
+
+    private void SetLocalSeat(int seatIndex)
+    {
+        var claim = new Hashtable();
+        for (int i = 0; i < 8; i++) claim[SEAT_KEY_PREFIX + i] = false;
+        claim[SEAT_KEY_PREFIX + seatIndex] = true;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(claim);
+    }
+
+    private bool IsGameStarted()
+    {
+        if (PhotonNetwork.CurrentRoom == null) return false;
+        return PhotonNetwork.CurrentRoom.CustomProperties
+            .TryGetValue(ROOM_STARTED_KEY, out object v) && v is bool b && b;
     }
 
     private void RefreshSeats()
@@ -186,5 +232,11 @@ public class HPNetworkClient : MonoBehaviourPunCallbacks
     private void SetStatus(string msg)
     {
         if (statusText != null) statusText.text = msg;
+    }
+
+    private static Text FindTextByName(string objectName)
+    {
+        GameObject go = GameObject.Find(objectName);
+        return go != null ? go.GetComponent<Text>() : null;
     }
 }

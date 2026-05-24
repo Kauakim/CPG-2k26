@@ -1,10 +1,11 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 /// MonoBehaviour colocado no PlayerUI (World Space Canvas filho de cada Personagem).
 /// Todas as referências de filhos são atribuídas via Inspector ou com o
 /// [ContextMenu] abaixo. Não cria nenhum elemento em runtime.
-public class HPSeatView : MonoBehaviour
+public class HPSeatView : MonoBehaviour, IPointerClickHandler
 {
     [Header("Textos")]
     [SerializeField] private Text nameText;
@@ -29,8 +30,11 @@ public class HPSeatView : MonoBehaviour
     [SerializeField] private Sprite cardAtestado;
     [SerializeField] private Sprite cardMonster;
     [SerializeField] private Sprite cardGPT;
+    [SerializeField] private Sprite cardCalculadora;
 
     private CanvasGroup group;
+    private HPGameManager game;
+    private int seatIndex = -1;
 
     private void Awake()
     {
@@ -55,6 +59,18 @@ public class HPSeatView : MonoBehaviour
     {
         Transform t = transform.Find(childName);
         return t != null ? t.GetComponent<T>() : null;
+    }
+
+    public void BindSeatIndex(int index, HPGameManager manager)
+    {
+        seatIndex = index;
+        game = manager;
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        if (seatIndex < 0 || game == null) return;
+        game.OnSeatClicked(seatIndex);
     }
 
     // ── API ───────────────────────────────────────────────────────────────────
@@ -150,6 +166,7 @@ public class HPSeatView : MonoBehaviour
             case HPCardType.Atestado: return cardAtestado;
             case HPCardType.Monster:  return cardMonster;
             case HPCardType.GPT:      return cardGPT;
+            case HPCardType.Calculadora: return cardCalculadora;
             default:                  return null;
         }
     }

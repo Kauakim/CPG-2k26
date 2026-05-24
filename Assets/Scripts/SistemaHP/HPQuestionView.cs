@@ -44,6 +44,22 @@ public class HPQuestionView : MonoBehaviour
     public void ShowBoard()
     {
         if (panel != null) panel.SetActive(true);
+        if (playerNameText != null) playerNameText.text = "";
+        SetInputVisible(false);
+    }
+
+    public void ShowLobbyStatus(string title, string message)
+    {
+        if (panel != null) panel.SetActive(true);
+        if (playerNameText != null) playerNameText.text = title;
+        if (questionText != null) questionText.text = message;
+        SetInputVisible(false);
+        if (answerInput != null) answerInput.text = "";
+    }
+
+    public void HideBoard()
+    {
+        if (panel != null) panel.SetActive(false);
         SetInputVisible(false);
     }
 

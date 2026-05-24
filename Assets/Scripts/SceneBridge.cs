@@ -86,6 +86,14 @@ public class SceneBridge : MonoBehaviour
                 characterSlots[i].gameObject.SetActive(i < count);
     }
 
+    /// Ativa/desativa um personagem específico pelo índice.
+    public void SetPlayerActive(int index, bool active)
+    {
+        if (index < 0 || index >= characterSlots.Length) return;
+        if (characterSlots[index] != null)
+            characterSlots[index].gameObject.SetActive(active);
+    }
+
     /// Desliga luz, seta e DERRAUNDE; oculta todos os personagens.
     public void ResetAll()
     {
@@ -103,15 +111,49 @@ public class SceneBridge : MonoBehaviour
         return characterSlots[index];
     }
 
+    public bool TryGetCharacterIndexAtScreenPosition(Vector2 screenPosition, out int index)
+    {
+        index = -1;
+        Camera cam = Camera.main;
+        if (cam == null) return false;
+
+        Vector3 world = cam.ScreenToWorldPoint(screenPosition);
+        Vector2 point = new Vector2(world.x, world.y);
+
+        for (int i = 0; i < characterSlots.Length; i++)
+        {
+            Transform slot = characterSlots[i];
+            if (slot == null || !slot.gameObject.activeInHierarchy) continue;
+
+            SpriteRenderer[] renderers = slot.GetComponentsInChildren<SpriteRenderer>(false);
+            for (int r = 0; r < renderers.Length; r++)
+            {
+                if (!renderers[r].enabled) continue;
+                if (!renderers[r].bounds.Contains(point)) continue;
+                index = i;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// Tinta o sprite do personagem de vermelho ao ser eliminado.
     /// Chame com eliminated=false para restaurar a cor original.
     public void SetPlayerEliminated(int playerIndex, bool eliminated)
     {
+        SetCharacterTint(playerIndex, eliminated ? new Color(1f, 0.28f, 0.28f, 1f) : Color.white);
+    }
+
+    /// Aplica uma cor em todos os sprites do personagem.
+    public void SetCharacterTint(int playerIndex, Color color)
+    {
         Transform t = GetCharacterTransform(playerIndex);
         if (t == null) return;
-        SpriteRenderer sr = t.GetComponent<SpriteRenderer>();
-        if (sr == null) return;
-        sr.color = eliminated ? new Color(1f, 0.28f, 0.28f, 1f) : Color.white;
+
+        SpriteRenderer[] renderers = t.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+            renderers[i].color = color;
     }
 
     /// Retorna o sprite do SpriteRenderer do personagem indicado.
@@ -119,7 +161,7 @@ public class SceneBridge : MonoBehaviour
     {
         Transform t = GetCharacterTransform(playerIndex);
         if (t == null) return null;
-        SpriteRenderer sr = t.GetComponent<SpriteRenderer>();
+        SpriteRenderer sr = t.GetComponentInChildren<SpriteRenderer>(true);
         return sr != null ? sr.sprite : null;
     }
 
