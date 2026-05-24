@@ -24,6 +24,9 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
     [SerializeField] private Text       statusText;     // "Conectando…" / "Aguardando…"
     [SerializeField] private Text       linkText;       // exibe o link compartilhável
 
+    [Header("UI — Código da sala (opcional)")]
+    [SerializeField] private Text       roomCodeDisplay; // exibe apenas o código (ex: "XKBR") no canto superior esquerdo
+
     [Header("Labels de nome sobre cada personagem (opcional)")]
     [SerializeField] private Text[] seatLabels = new Text[8];
 
@@ -123,6 +126,15 @@ public class HPNetworkManager : MonoBehaviourPunCallbacks
         string code = PhotonNetwork.CurrentRoom.Name;
         string link = BuildShareLink(code);
         if (linkText != null) linkText.text = link;
+        if (roomCodeDisplay != null) 
+        {
+            roomCodeDisplay.text = code;
+            Debug.Log($"[Network] Código exibido no RoomCodeDisplay: {code}");
+        }
+        else
+        {
+            Debug.LogWarning("[Network] ⚠️ roomCodeDisplay está NULL! Verifique o Inspector do NetworkManager!");
+        }
 
         SetStatus("Na sessão — código: " + code);
         RefreshSeats();
