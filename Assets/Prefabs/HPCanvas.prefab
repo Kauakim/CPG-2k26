@@ -623,7 +623,7 @@ MonoBehaviour:
   timerMax: 30
   timerPenalty: 8
   lobbyCountdownSeconds: 3
-  lobbyWaitSeconds: 60
+  lobbyWaitSeconds: 3
   botAnswerDelayMin: 1.2
   botAnswerDelayMax: 2.4
   autoAddLocalPlayer: 1
