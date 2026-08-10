@@ -59,6 +59,9 @@ MonoBehaviour:
   - RPC_StartCountdown
   - RPC_SyncLobbyCountdown
   - RPC_SyncLobbyUI
+  - RPC_ConfirmSeat
+  - RPC_RequestSeat
+  - RPC_ResetExpression
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 0
